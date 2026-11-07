@@ -1,16 +1,19 @@
 {
   "expo": {
-    "name": "sp-tmp",
-    "slug": "sp-tmp",
+    "name": "Search Price",
+    "slug": "search-price",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "sptmp",
+    "scheme": "searchprice",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.searchprice.app",
+      "supportsTablet": false
     },
     "android": {
+      "package": "com.searchprice.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -20,7 +23,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "server",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -32,11 +35,31 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Search Price 需要使用相機掃描商品條碼並辨識價格標籤。",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Search Price 會使用你的位置自動判斷目前所在的門市（例如 7-Eleven、全家）。"
+        }
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "11026ec1-5696-4c0a-ad95-c3d32d776a1a"
+      }
+    },
+    "owner": "suxstarculture"
   }
 }

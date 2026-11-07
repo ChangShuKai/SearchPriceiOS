@@ -1,0 +1,85 @@
+import * as Location from 'expo-location';
+
+import { matchChain, type StoreChain } from '@/constants/stores';
+
+export type NearbyStore = {
+  chain: StoreChain;
+  /** 門市名稱，例如「7-ELEVEN 信義門市」 */
+  name: string;
+  distance: number; // 公尺
+  latitude: number;
+  longitude: number;
+};
+
+export type DetectResult = {
+  coords: { latitude: number; longitude: number } | null;
+  stores: NearbyStore[];
+  error?: string;
+};
+
+const OVERPASS = 'https://overpass-api.de/api/interpreter';
+const RADIUS_M = 250;
+
+function haversine(aLat: number, aLng: number, bLat: number, bLng: number) {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+type OsmElement = {
+  lat?: number;
+  lon?: number;
+  center?: { lat: number; lon: number };
+  tags?: Record<string, string>;
+};
+
+/** 透過 OpenStreetMap 查詢附近的連鎖門市，依距離排序。 */
+async function queryNearbyStores(lat: number, lng: number): Promise<NearbyStore[]> {
+  const q = `[out:json][timeout:10];
+nwr(around:${RADIUS_M},${lat},${lng})[shop~"^(convenience|supermarket|wholesale|chemist|department_store|general|variety_store)$"];
+out center tags 50;`;
+  const res = await fetch(OVERPASS, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'SearchPrice/1.0' },
+    body: `data=${encodeURIComponent(q)}`,
+  });
+  if (!res.ok) throw new Error(`Overpass HTTP ${res.status}`);
+  const json = (await res.json()) as { elements: OsmElement[] };
+  const stores: NearbyStore[] = [];
+  for (const el of json.elements ?? []) {
+    const t = el.tags ?? {};
+    const sLat = el.lat ?? el.center?.lat;
+    const sLng = el.lon ?? el.center?.lon;
+    if (sLat == null || sLng == null) continue;
+    const chain = matchChain(t['brand:zh'], t.brand, t['name:zh'], t.name, t['name:en'], t['brand:en'], t.operator);
+    if (!chain) continue;
+    stores.push({
+      chain,
+      name: t['name:zh'] ?? t.name ?? chain.name,
+      distance: Math.round(haversine(lat, lng, sLat, sLng)),
+      latitude: sLat,
+      longitude: sLng,
+    });
+  }
+  return stores.sort((a, b) => a.distance - b.distance);
+}
+
+/** 取得目前位置並偵測最近的門市。 */
+export async function detectNearbyStores(): Promise<DetectResult> {
+  const perm = await Location.requestForegroundPermissionsAsync();
+  if (perm.status !== 'granted') {
+    return { coords: null, stores: [], error: '未授權定位，請手動選擇通路' };
+  }
+  const last = await Location.getLastKnownPositionAsync({ maxAge: 60_000 });
+  const pos = last ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }));
+  const coords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+  try {
+    const stores = await queryNearbyStores(coords.latitude, coords.longitude);
+    return { coords, stores, error: stores.length ? undefined : '附近找不到連鎖門市，請手動選擇' };
+  } catch {
+    return { coords, stores: [], error: '查詢附近門市失敗，請手動選擇' };
+  }
+}
