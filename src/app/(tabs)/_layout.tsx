@@ -13,6 +13,13 @@ export default function TabLayout() {
           md="local_offer"
         />
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="radar">
+        <NativeTabs.Trigger.Label>超商雷達</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'sparkles', selected: 'sparkles' }}
+          md="auto_awesome"
+        />
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>掃描比價</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="barcode.viewfinder" md="barcode_scanner" />

@@ -15,7 +15,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { getLatestPricesByChain, getProductNamesForBarcode, type PriceReport } from '@/lib/db';
 import { fetchOpenFoodFacts, type OffProduct } from '@/lib/openfoodfacts';
 import { fetchRemoteBarcode } from '@/lib/sync';
-import { getExpiringDiscountInfo } from '@/lib/discount-service';
+import { fetchProductFoodSafety, getExpiringDiscountInfo, type FoodSafetyDetail } from '@/lib/discount-service';
 import { formatDate, formatPrice, relativeTime } from '@/lib/utils';
 
 type Row = PriceReport & { report_count: number };
@@ -30,6 +30,7 @@ export default function ProductScreen() {
   const [localLoading, setLocalLoading] = useState(true);
   const [remoteLoading, setRemoteLoading] = useState(true);
   const [off, setOff] = useState<OffState>({ loading: true, product: null });
+  const [foodSafety, setFoodSafety] = useState<FoodSafetyDetail | null>(null);
 
   const fetchLocal = useCallback(
     () => Promise.all([getLatestPricesByChain(barcode), getProductNamesForBarcode(barcode)]),
@@ -42,6 +43,9 @@ export default function ProductScreen() {
       if (ctrl.signal.aborted) return;
       setRows(r);
       setNames(n);
+      void fetchProductFoodSafety(barcode, n[0] ?? r[0]?.product_name).then((fsData) => {
+        if (!ctrl.signal.aborted && fsData) setFoodSafety(fsData);
+      });
     };
     // 1) 本地資料庫：立即顯示
     fetchLocal()
@@ -96,7 +100,8 @@ export default function ProductScreen() {
   const productImage = customImage ?? off.product?.imageUrl;
 
   const basePriceForDiscount = rows[0]?.price ?? (rows.length > 0 ? rows[0].price : 39);
-  const discountInfo = getExpiringDiscountInfo(title, basePriceForDiscount);
+  const availableChains = rows.map((r) => r.store_chain);
+  const discountInfo = getExpiringDiscountInfo(title, basePriceForDiscount, barcode, availableChains);
 
   return (
     <View style={[styles.flex, !glassSupported && { backgroundColor: theme.background }]}>
@@ -143,31 +148,37 @@ export default function ProductScreen() {
             </View>
 
             <View style={styles.expiringRow}>
-              <View style={styles.expiringPill}>
-                <ThemedText variant="caption" secondary>
-                  7-11 i珍食 (65折)
-                </ThemedText>
-                <ThemedText variant="headline" style={{ color: '#FF3B30', fontWeight: '800', fontSize: 18 }}>
-                  {formatPrice(discountInfo.sevenElevenPrice)}
-                </ThemedText>
-                <ThemedText variant="caption" style={{ color: theme.success, fontWeight: '600' }}>
-                  現省 {formatPrice(discountInfo.savingsSeven)}
-                </ThemedText>
-              </View>
+              {discountInfo.hasSevenEleven && (
+                <View style={styles.expiringPill}>
+                  <ThemedText variant="caption" secondary>
+                    7-11 i珍食 (65折)
+                  </ThemedText>
+                  <ThemedText variant="headline" style={{ color: '#FF3B30', fontWeight: '800', fontSize: 18 }}>
+                    {formatPrice(discountInfo.sevenElevenPrice)}
+                  </ThemedText>
+                  <ThemedText variant="caption" style={{ color: theme.success, fontWeight: '600' }}>
+                    現省 {formatPrice(discountInfo.savingsSeven)}
+                  </ThemedText>
+                </View>
+              )}
 
-              <View style={[styles.expiringDivider, { backgroundColor: theme.separator }]} />
+              {discountInfo.hasSevenEleven && discountInfo.hasFamilyMart && (
+                <View style={[styles.expiringDivider, { backgroundColor: theme.separator }]} />
+              )}
 
-              <View style={styles.expiringPill}>
-                <ThemedText variant="caption" secondary>
-                  全家友善時光 (7折)
-                </ThemedText>
-                <ThemedText variant="headline" style={{ color: '#FF3B30', fontWeight: '800', fontSize: 18 }}>
-                  {formatPrice(discountInfo.familyMartPrice)}
-                </ThemedText>
-                <ThemedText variant="caption" style={{ color: theme.success, fontWeight: '600' }}>
-                  現省 {formatPrice(discountInfo.savingsFamily)}
-                </ThemedText>
-              </View>
+              {discountInfo.hasFamilyMart && (
+                <View style={styles.expiringPill}>
+                  <ThemedText variant="caption" secondary>
+                    全家友善時光 (7折)
+                  </ThemedText>
+                  <ThemedText variant="headline" style={{ color: '#FF3B30', fontWeight: '800', fontSize: 18 }}>
+                    {formatPrice(discountInfo.familyMartPrice)}
+                  </ThemedText>
+                  <ThemedText variant="caption" style={{ color: theme.success, fontWeight: '600' }}>
+                    現省 {formatPrice(discountInfo.savingsFamily)}
+                  </ThemedText>
+                </View>
+              )}
             </View>
           </Glass>
         )}
@@ -250,6 +261,108 @@ export default function ProductScreen() {
               </ThemedText>
             </Pressable>
           </Glass>
+        )}
+
+        {/* 超商食安與營養身分證 (7-11 / 全家食在購安心) */}
+        {foodSafety && (
+          <>
+            <SectionTitle title="營養標示與食安資訊" />
+            <Glass style={styles.offCard}>
+              <View style={styles.fsBadgeRow}>
+                {foodSafety.category && (
+                  <View style={[styles.fsTag, { backgroundColor: theme.tint + '18' }]}>
+                    <ThemedText variant="footnote" style={{ color: theme.tint, fontWeight: '700' }}>
+                      {foodSafety.category}
+                    </ThemedText>
+                  </View>
+                )}
+                {foodSafety.isNew && (
+                  <View style={[styles.fsTag, { backgroundColor: '#FF9500' }]}>
+                    <ThemedText variant="footnote" style={{ color: '#fff', fontWeight: '700' }}>
+                      新品上市
+                    </ThemedText>
+                  </View>
+                )}
+                {foodSafety.isSpecialSale && (
+                  <View style={[styles.fsTag, { backgroundColor: '#FF3B30' }]}>
+                    <ThemedText variant="footnote" style={{ color: '#fff', fontWeight: '700' }}>
+                      當期特惠
+                    </ThemedText>
+                  </View>
+                )}
+              </View>
+
+              {(foodSafety.calories != null ||
+                foodSafety.protein != null ||
+                foodSafety.carb != null ||
+                foodSafety.totalFat != null) && (
+                <View style={styles.nutrientGrid}>
+                  {foodSafety.calories != null && String(foodSafety.calories) !== '' && (
+                    <View style={styles.nutrientCell}>
+                      <ThemedText variant="footnote" secondary>
+                        熱量
+                      </ThemedText>
+                      <ThemedText variant="headline" style={{ fontWeight: '800' }}>
+                        {foodSafety.calories} kcal
+                      </ThemedText>
+                    </View>
+                  )}
+                  {foodSafety.protein != null && (
+                    <View style={styles.nutrientCell}>
+                      <ThemedText variant="footnote" secondary>
+                        蛋白質
+                      </ThemedText>
+                      <ThemedText variant="headline" style={{ fontWeight: '800' }}>
+                        {foodSafety.protein}g
+                      </ThemedText>
+                    </View>
+                  )}
+                  {foodSafety.carb != null && (
+                    <View style={styles.nutrientCell}>
+                      <ThemedText variant="footnote" secondary>
+                        碳水
+                      </ThemedText>
+                      <ThemedText variant="headline" style={{ fontWeight: '800' }}>
+                        {foodSafety.carb}g
+                      </ThemedText>
+                    </View>
+                  )}
+                  {foodSafety.totalFat != null && (
+                    <View style={styles.nutrientCell}>
+                      <ThemedText variant="footnote" secondary>
+                        脂肪
+                      </ThemedText>
+                      <ThemedText variant="headline" style={{ fontWeight: '800' }}>
+                        {foodSafety.totalFat}g
+                      </ThemedText>
+                    </View>
+                  )}
+                  {foodSafety.sodium != null && (
+                    <View style={styles.nutrientCell}>
+                      <ThemedText variant="footnote" secondary>
+                        鈉含量
+                      </ThemedText>
+                      <ThemedText variant="headline" style={{ fontWeight: '800' }}>
+                        {foodSafety.sodium}mg
+                      </ThemedText>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {foodSafety.allergens && foodSafety.allergens.length > 0 && (
+                <View style={[styles.allergenBox, { backgroundColor: '#FF3B3014' }]}>
+                  <ThemedText variant="caption" style={{ color: '#FF3B30', fontWeight: '700' }}>
+                    ⚠️ 過敏原提醒：{foodSafety.allergens.join('、')}
+                  </ThemedText>
+                </View>
+              )}
+
+              <InfoRow label="商品說明" value={foodSafety.description} />
+              <InfoRow label="製造廠商" value={foodSafety.manufacturer} />
+              <InfoRow label="產地地址" value={foodSafety.manufacturerAddress} />
+            </Glass>
+          </>
         )}
 
         {/* Open Food Facts */}
@@ -378,6 +491,36 @@ const styles = StyleSheet.create({
   expiringDivider: {
     width: StyleSheet.hairlineWidth,
     height: 36,
+  },
+  fsBadgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  fsTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Radius.pill,
+  },
+  nutrientGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+    paddingVertical: Spacing.one,
+  },
+  nutrientCell: {
+    flex: 1,
+    minWidth: 72,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: Radius.sm,
+    backgroundColor: 'rgba(120,120,128,0.08)',
+    alignItems: 'center',
+    gap: 2,
+  },
+  allergenBox: {
+    padding: Spacing.two,
+    borderRadius: Radius.sm,
   },
   infoRow: { flexDirection: 'row', gap: Spacing.three },
   infoLabel: { width: 80 },

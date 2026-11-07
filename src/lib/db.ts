@@ -18,6 +18,55 @@ export type PriceReport = {
 
 type LocalRow = PriceReport & { synced: number };
 
+/**
+ * 過濾掉任何非該通路實際販售的模擬跨通路價格，確保 100% 資訊真實：
+ * - 7-Eleven 鮮食母庫商品僅保留 `7-eleven`
+ * - 全家食安網母庫商品僅保留 `familymart`
+ * - 全聯、寶雅、康是美官方單一來源爬蟲僅保留該通路本身真實售價
+ */
+export function isAuthenticChainReport(r: PriceReport): boolean {
+  const dev = r.device_id ?? '';
+  const bc = r.barcode ?? '';
+  const src = r.source_url ?? '';
+  const chain = r.store_chain;
+
+  if (
+    (dev === '711-full-sync-v3' || dev === '711-full-xml-v2' || bc.startsWith('471711') || src.includes('7-11.com.tw')) &&
+    chain !== '7-eleven'
+  ) {
+    return false;
+  }
+
+  if (
+    (dev === 'fm-full-sync-v3' ||
+      dev === 'fm-foodsafety-v2' ||
+      bc.startsWith('471000') ||
+      bc.startsWith('471004') ||
+      src.includes('family.com.tw')) &&
+    chain !== 'familymart'
+  ) {
+    return false;
+  }
+
+  if ((dev === 'pxmart-official-v1' || src.includes('pxmart.com.tw')) && chain !== 'pxmart') {
+    return false;
+  }
+
+  if ((dev === 'poya-91app-v1' || dev === 'poya-daily-v2' || src.includes('poyabuy.com.tw')) && chain !== 'poya') {
+    return false;
+  }
+
+  if ((dev === 'cosmed-91app-v1' || src.includes('cosmed.com.tw')) && chain !== 'cosmed') {
+    return false;
+  }
+
+  if (dev === 'convenience-food-sync-v1') {
+    return false;
+  }
+
+  return true;
+}
+
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 export function getDb(): Promise<SQLite.SQLiteDatabase> {
@@ -58,14 +107,16 @@ export function getDb(): Promise<SQLite.SQLiteDatabase> {
 
       // 檢查是否已載入初始離線資料庫（首開秒用、斷網可用）
       try {
-        const seedMeta = await db.getFirstAsync<{ value: string }>('SELECT value FROM meta WHERE key = ?', 'seed_loaded_v7');
+        const seedMeta = await db.getFirstAsync<{ value: string }>('SELECT value FROM meta WHERE key = ?', 'seed_loaded_v14');
         if (!seedMeta?.value) {
           const seed = require('@/constants/seed-data.json') as PriceReport[];
           if (Array.isArray(seed) && seed.length > 0) {
+            const validSeed = seed.filter(isAuthenticChainReport);
             await db.withTransactionAsync(async () => {
-              for (const r of seed) {
+              await db.runAsync('DELETE FROM price_reports WHERE synced = 1');
+              for (const r of validSeed) {
                 await db.runAsync(
-                  `INSERT OR IGNORE INTO price_reports
+                  `INSERT OR REPLACE INTO price_reports
                     (id, barcode, product_name, price, store_chain, store_name, latitude, longitude, reported_at, device_id, image_url, source_url, synced)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
                   r.id,
@@ -83,7 +134,7 @@ export function getDb(): Promise<SQLite.SQLiteDatabase> {
                 );
               }
             });
-            await db.runAsync('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', 'seed_loaded_v7', '1');
+            await db.runAsync('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', 'seed_loaded_v14', '1');
           }
         }
       } catch (err) {
@@ -127,10 +178,11 @@ export async function insertLocalReport(r: PriceReport): Promise<void> {
 
 /** 寫入從伺服器下載的資料（標記為已同步）。 */
 export async function upsertRemoteReports(rows: PriceReport[]): Promise<void> {
-  if (rows.length === 0) return;
+  const validRows = rows.filter(isAuthenticChainReport);
+  if (validRows.length === 0) return;
   const db = await getDb();
   await db.withTransactionAsync(async () => {
-    for (const r of rows) {
+    for (const r of validRows) {
       await db.runAsync(
         `INSERT OR REPLACE INTO price_reports
           (id, barcode, product_name, price, store_chain, store_name, latitude, longitude, reported_at, device_id, image_url, source_url, synced)
@@ -167,7 +219,7 @@ export async function countUnsynced(): Promise<number> {
 /** 每個通路最新的一筆價格，依價格由低到高排序。 */
 export async function getLatestPricesByChain(barcode: string): Promise<(PriceReport & { report_count: number })[]> {
   const db = await getDb();
-  return db.getAllAsync<PriceReport & { report_count: number }>(
+  const rows = await db.getAllAsync<PriceReport & { report_count: number }>(
     `SELECT r.*, (SELECT COUNT(*) FROM price_reports c WHERE c.barcode = r.barcode AND c.store_chain = r.store_chain) AS report_count
        FROM price_reports r
       WHERE r.barcode = ?
@@ -178,6 +230,7 @@ export async function getLatestPricesByChain(barcode: string): Promise<(PriceRep
       ORDER BY r.price ASC`,
     barcode,
   );
+  return rows.filter(isAuthenticChainReport);
 }
 
 /** 此條碼最常被使用者填寫的商品名稱。 */

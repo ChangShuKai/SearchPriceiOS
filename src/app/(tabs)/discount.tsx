@@ -22,14 +22,21 @@ import { getStoreIcon } from '@/constants/store-icons';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
-  fetchFamilyMartDiscounts,
-  fetchSevenElevenDiscounts,
+  checkDiscountTimeStatus,
+  fetchChainDiscounts,
   type ChainChoice,
   type DiscountCategory,
   type DiscountProduct,
   type DiscountStore,
 } from '@/lib/discount-service';
 import { formatPrice } from '@/lib/utils';
+
+const CHAIN_LABELS: Record<ChainChoice, string> = {
+  '7-eleven': '7-Eleven',
+  familymart: '全家',
+  pxmart: '全聯',
+  poya: '寶雅',
+};
 
 export default function DiscountScreen() {
   const theme = useTheme();
@@ -54,6 +61,7 @@ export default function DiscountScreen() {
     lat: 25.033964,
     lng: 121.564468, // 預設台北信義區中心
   });
+  const timeStatus = checkDiscountTimeStatus(selectedChain);
 
   // 取得定位並載入門市即期品
   useEffect(() => {
@@ -71,10 +79,7 @@ export default function DiscountScreen() {
           }
         }
 
-        const result =
-          selectedChain === 'familymart'
-            ? await fetchFamilyMartDiscounts(coords.lat, coords.lng)
-            : await fetchSevenElevenDiscounts(coords.lat, coords.lng);
+        const result = await fetchChainDiscounts(selectedChain, coords.lat, coords.lng);
 
         if (!cancelled) {
           setStores(result);
@@ -98,10 +103,7 @@ export default function DiscountScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const result =
-        selectedChain === 'familymart'
-          ? await fetchFamilyMartDiscounts(userCoords.lat, userCoords.lng)
-          : await fetchSevenElevenDiscounts(userCoords.lat, userCoords.lng);
+      const result = await fetchChainDiscounts(selectedChain, userCoords.lat, userCoords.lng);
       setStores(result);
     } catch (err) {
       console.warn('重整即期品失敗:', err);
@@ -162,7 +164,7 @@ export default function DiscountScreen() {
               即期特惠
             </ThemedText>
             <ThemedText variant="caption" secondary>
-              7-11 i珍食 65折 · 全家友善時光 7折 即時地圖庫存
+              7-11 i珍食 · 全家友善時光 · 全聯惜食 · 寶雅特賣
             </ThemedText>
           </View>
 
@@ -175,7 +177,7 @@ export default function DiscountScreen() {
             style={[styles.dropdownBtn, { borderColor: theme.separator }]}>
             <Image source={getStoreIcon(selectedChain)} style={styles.dropdownLogo} contentFit="contain" />
             <ThemedText variant="headline" style={styles.dropdownText}>
-              {selectedChain === '7-eleven' ? '7-Eleven' : '全家'}
+              {CHAIN_LABELS[selectedChain]}
             </ThemedText>
             <SymbolView
               name={dropdownOpen ? 'chevron.up' : 'chevron.down'}
@@ -218,10 +220,50 @@ export default function DiscountScreen() {
               <View style={styles.itemTextContainer}>
                 <ThemedText variant="headline">全家便利商店 (友善時光)</ThemedText>
                 <ThemedText variant="caption" secondary>
-                  全品項 7 折 · 每日 17:00-24:00 (即時庫存)
+                  全品項 7 折 · 每日 10:00-17:00 / 17:00-24:00
                 </ThemedText>
               </View>
               {selectedChain === 'familymart' && (
+                <SymbolView name="checkmark.circle.fill" size={18} tintColor={theme.tint} />
+              )}
+            </Pressable>
+
+            <View style={[styles.separator, { backgroundColor: theme.separator }]} />
+
+            <Pressable
+              style={[
+                styles.dropdownItem,
+                selectedChain === 'pxmart' && { backgroundColor: theme.tint + '15' },
+              ]}
+              onPress={() => handleSelectChain('pxmart')}>
+              <Image source={getStoreIcon('pxmart')} style={styles.itemLogo} contentFit="contain" />
+              <View style={styles.itemTextContainer}>
+                <ThemedText variant="headline">全聯福利中心 (惜食地圖)</ThemedText>
+                <ThemedText variant="caption" secondary>
+                  生鮮/美味堂/阪急麵包 6折·8折 · 11:00-14:00 / 16:00-22:00
+                </ThemedText>
+              </View>
+              {selectedChain === 'pxmart' && (
+                <SymbolView name="checkmark.circle.fill" size={18} tintColor={theme.tint} />
+              )}
+            </Pressable>
+
+            <View style={[styles.separator, { backgroundColor: theme.separator }]} />
+
+            <Pressable
+              style={[
+                styles.dropdownItem,
+                selectedChain === 'poya' && { backgroundColor: theme.tint + '15' },
+              ]}
+              onPress={() => handleSelectChain('poya')}>
+              <Image source={getStoreIcon('poya')} style={styles.itemLogo} contentFit="contain" />
+              <View style={styles.itemTextContainer}>
+                <ThemedText variant="headline">寶雅 POYA (限時特賣·買一送一)</ThemedText>
+                <ThemedText variant="caption" secondary>
+                  官方特惠庫存與原價對照 · 每日 10:00-22:30
+                </ThemedText>
+              </View>
+              {selectedChain === 'poya' && (
                 <SymbolView name="checkmark.circle.fill" size={18} tintColor={theme.tint} />
               )}
             </Pressable>
@@ -233,7 +275,7 @@ export default function DiscountScreen() {
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color={theme.tint} />
             <ThemedText secondary style={{ marginTop: Spacing.three }}>
-              正在搜尋周圍最近的 {selectedChain === '7-eleven' ? '7-Eleven' : '全家'} 門市即期品...
+              正在搜尋周圍最近的 {CHAIN_LABELS[selectedChain]} 門市特惠商品...
             </ThemedText>
           </View>
         ) : selectedCategory ? (
@@ -261,8 +303,8 @@ export default function DiscountScreen() {
 
             <View style={styles.listContainer}>
               {selectedCategory.products.map((p, idx) => (
-                <Glass key={p.id || idx} style={styles.productCard}>
-                  <View style={styles.productRow}>
+                <Glass key={p.id || idx} interactive style={styles.productCard}>
+                  <Pressable style={styles.productRow} onPress={() => goToProductComparison(p)}>
                     {/* 左邊：商品圖片 */}
                     <View style={styles.productImgBox}>
                       {p.imageUrl ? (
@@ -288,6 +330,13 @@ export default function DiscountScreen() {
                             {p.discountRate}
                           </ThemedText>
                         </View>
+                        {p.isNew && (
+                          <View style={[styles.discountRateBadge, { backgroundColor: '#FF9500' }]}>
+                            <ThemedText variant="caption" style={{ color: '#fff', fontWeight: '700' }}>
+                              新品
+                            </ThemedText>
+                          </View>
+                        )}
                         <View style={[styles.stockBadge, { backgroundColor: theme.tint + '18' }]}>
                           <ThemedText variant="caption" style={{ color: theme.tint, fontWeight: '600' }}>
                             剩餘 {p.count} 件
@@ -309,15 +358,13 @@ export default function DiscountScreen() {
                       <ThemedText variant="caption" secondary style={styles.strikethrough}>
                         原價 {formatPrice(p.originalPrice)}
                       </ThemedText>
-                      <Pressable
-                        style={[styles.compareBtn, { backgroundColor: theme.tint }]}
-                        onPress={() => goToProductComparison(p)}>
+                      <View style={[styles.compareBtn, { backgroundColor: theme.tint }]}>
                         <ThemedText variant="caption" style={{ color: '#fff', fontWeight: '600' }}>
-                          比價
+                          比價·營養
                         </ThemedText>
-                      </Pressable>
+                      </View>
                     </View>
-                  </View>
+                  </Pressable>
                 </Glass>
               ))}
             </View>
@@ -414,12 +461,20 @@ export default function DiscountScreen() {
               </ThemedText>
             </View>
 
-            {stores.length === 0 ? (
+            {!timeStatus.isDiscountTime || stores.length === 0 ? (
               <Glass style={styles.emptyCard}>
-                <SymbolView name="storefront" size={36} tintColor={theme.textSecondary} />
-                <ThemedText secondary style={{ textAlign: 'center', marginTop: Spacing.three }}>
-                  目前周圍門市暫無剩餘的即期品，請稍候重整或於特惠時段（17:00 / 20:00）查詢！
+                <SymbolView name="clock.badge.exclamationmark" size={42} tintColor={theme.tint} />
+                <ThemedText variant="title" style={{ textAlign: 'center', marginTop: Spacing.three }}>
+                  目前非即期品時間暫無數據
                 </ThemedText>
+                <ThemedText variant="caption" secondary style={{ textAlign: 'center', marginTop: Spacing.two }}>
+                  {timeStatus.scheduleText}
+                </ThemedText>
+                <View style={[styles.nextWindowPill, { backgroundColor: theme.tint + '18' }]}>
+                  <ThemedText variant="caption" style={{ color: theme.tint, fontWeight: '700' }}>
+                    {timeStatus.nextWindowText}
+                  </ThemedText>
+                </View>
               </Glass>
             ) : (
               stores.map((st) => (
@@ -586,6 +641,12 @@ const styles = StyleSheet.create({
     padding: Spacing.five,
     borderRadius: Radius.lg,
     alignItems: 'center',
+  },
+  nextWindowPill: {
+    marginTop: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 6,
+    borderRadius: Radius.pill,
   },
   backBtn: {
     flexDirection: 'row',
