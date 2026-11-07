@@ -1,4 +1,4 @@
-name: Build iOS IPA
+name: Build iOS IPA and Android APK (Free GitHub Runner)
 
 on:
   workflow_dispatch:
@@ -16,63 +16,96 @@ jobs:
           node-version: 20
           cache: 'npm'
 
+      - name: Setup Java (JDK 17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
       - name: Install Dependencies
         run: npm install
 
+      # 1. 本地生成原生 Android 與 iOS 代碼（不走 Expo 雲端）
       - name: Prebuild Native Folders
-        run: npx expo prebuild --platform ios --clean
+        run: npx expo prebuild --clean
 
+      # --------------------------------------------------
+      # 2. 編譯 Android Release APK
+      # --------------------------------------------------
+      - name: Build Android Release APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          cd ..
+          
+          APK_FILE=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -z "$APK_FILE" ]; then
+            APK_FILE=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          fi
+          echo "Found APK: $APK_FILE"
+          cp "$APK_FILE" SearchPrice.apk
+
+      # --------------------------------------------------
+      # 3. 編譯 iOS 原生未簽名 IPA
+      # --------------------------------------------------
       - name: Install CocoaPods
         run: |
           cd ios
           pod install
+          cd ..
 
-      - name: Archive App
+      - name: Build iOS Application
         run: |
           cd ios
+          
+          # 找出 scheme 名稱，若無則抓 Target 名稱
           SCHEME_NAME=$(xcodebuild -workspace SearchPrice.xcworkspace -list -json | python3 -c "import sys, json; data=json.load(sys.stdin); schemes=data.get('workspace', {}).get('schemes', []); print(schemes[0] if schemes else 'SearchPrice')")
-          echo "Target Scheme: $SCHEME_NAME"
+          echo "Compiling Scheme: $SCHEME_NAME"
 
-          # 建立輸出目錄
-          mkdir -p build
+          # 建立明確的建置輸出目標目錄
+          mkdir -p build_output
 
-          # 執行 archive，加入允許 ad-hoc / 無簽名參數
-          xcodebuild archive \
+          # 核心編譯：明確指定 CONFIGURATION_BUILD_DIR，強制 Xcode 將產出的 .app 寫入該目錄
+          xcodebuild \
             -workspace SearchPrice.xcworkspace \
             -scheme "$SCHEME_NAME" \
             -configuration Release \
+            -sdk iphoneos \
             -destination "generic/platform=iOS" \
-            -archivePath "build/SearchPrice.xcarchive" \
+            CONFIGURATION_BUILD_DIR="$(pwd)/build_output" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES
+            COMPILER_INDEX_STORE_ENABLE=NO
 
-          echo "Checking archive contents:"
-          ls -la build/SearchPrice.xcarchive/Products/Applications || true
+          cd ..
 
-      - name: Package to IPA
+      - name: Package iOS IPA
         run: |
-          mkdir -p Payload
+          # 檢查 build_output 內的 .app
+          APP_DIR=$(find ios/build_output -type d -name "*.app" -maxdepth 1 | head -n 1)
           
-          # 精確抓取剛剛產出的 .app
-          APP_PATH=$(find ios/build/SearchPrice.xcarchive/Products/Applications -name "*.app" -maxdepth 1 2>/dev/null | head -n 1)
-          
-          if [ -z "$APP_PATH" ]; then
-            echo "Searching all .app in workspace as fallback:"
-            find . -name "*.app"
-            echo "Error: .app file not found!"
+          if [ -z "$APP_DIR" ]; then
+            echo "Searching all .app fallback:"
+            find . -type d -name "*.app" ! -path "*/Pods/*"
+            echo "Error: Xcode did not output .app to ios/build_output."
             exit 1
           fi
 
-          echo "Packaging: $APP_PATH"
-          cp -r "$APP_PATH" Payload/
-          zip -r SearchPriceiOS.ipa Payload
+          echo "Found Target App: $APP_DIR"
+          mkdir -p Payload
+          cp -r "$APP_DIR" Payload/
+          zip -r SearchPrice.ipa Payload
 
-      - name: Upload IPA Artifact
+      # --------------------------------------------------
+      # 4. 一鍵上傳雙端成品
+      # --------------------------------------------------
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: SearchPriceiOS-ipa
-          path: SearchPriceiOS.ipa
+          name: SearchPrice-Builds
+          path: |
+            SearchPrice.ipa
+            SearchPrice.apk
           retention-days: 7
-          
