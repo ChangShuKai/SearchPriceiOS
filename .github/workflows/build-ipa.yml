@@ -30,7 +30,12 @@ jobs:
       - name: Build Unsigned App
         run: |
           cd ios
-          xcodebuild -workspace *.xcworkspace -scheme $(ls *.xcworkspace | sed 's/\.xcworkspace//') \
+          # 精準解析 xcworkspace 內部真實 Scheme 名稱，避免誤抓 contentsdata
+          SCHEME_NAME=$(xcodebuild -workspace SearchPrice.xcworkspace -list -json | python3 -c "import sys, json; data=json.load(sys.stdin); schemes=data.get('workspace', {}).get('schemes', []); print(schemes[0] if schemes else 'SearchPrice')")
+          echo "Building Scheme: $SCHEME_NAME"
+
+          xcodebuild -workspace SearchPrice.xcworkspace \
+            -scheme "$SCHEME_NAME" \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath ./build \
@@ -41,7 +46,13 @@ jobs:
       - name: Package to IPA
         run: |
           mkdir -p Payload
-          cp -r ios/build/Build/Products/Release-iphoneos/*.app Payload/
+          # 尋找產出的 .app 並打包至 Payload
+          APP_PATH=$(find ios/build/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: .app file not found!"
+            exit 1
+          fi
+          cp -r "$APP_PATH" Payload/
           zip -r SearchPriceiOS.ipa Payload
 
       - name: Upload IPA Artifact
