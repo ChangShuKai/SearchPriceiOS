@@ -15,6 +15,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { getLatestPricesByChain, getProductNamesForBarcode, type PriceReport } from '@/lib/db';
 import { fetchOpenFoodFacts, type OffProduct } from '@/lib/openfoodfacts';
 import { fetchRemoteBarcode } from '@/lib/sync';
+import { getExpiringDiscountInfo } from '@/lib/discount-service';
 import { formatDate, formatPrice, relativeTime } from '@/lib/utils';
 
 type Row = PriceReport & { report_count: number };
@@ -94,6 +95,9 @@ export default function ProductScreen() {
   const customImage = rows.find((r) => r.image_url)?.image_url;
   const productImage = customImage ?? off.product?.imageUrl;
 
+  const basePriceForDiscount = rows[0]?.price ?? (rows.length > 0 ? rows[0].price : 39);
+  const discountInfo = getExpiringDiscountInfo(title, basePriceForDiscount);
+
   return (
     <View style={[styles.flex, !glassSupported && { backgroundColor: theme.background }]}>
       <ScrollView
@@ -122,6 +126,51 @@ export default function ProductScreen() {
             )}
           </View>
         </View>
+
+        {/* 即期特惠試算卡 (i珍食 65折 / 友善時光 7折) */}
+        {discountInfo.isDiscountable && rows.length > 0 && (
+          <Glass style={styles.expiringCard}>
+            <View style={styles.expiringCardHeader}>
+              <View style={styles.expiringTitleRow}>
+                <SymbolView name={{ ios: 'flame.fill', android: 'local_fire_department' }} size={16} tintColor="#FF3B30" />
+                <ThemedText variant="headline" style={{ color: '#FF3B30', fontWeight: '700' }}>
+                  超商即期限時特惠試算
+                </ThemedText>
+              </View>
+              <ThemedText variant="caption" secondary>
+                原價 {formatPrice(basePriceForDiscount)}
+              </ThemedText>
+            </View>
+
+            <View style={styles.expiringRow}>
+              <View style={styles.expiringPill}>
+                <ThemedText variant="caption" secondary>
+                  7-11 i珍食 (65折)
+                </ThemedText>
+                <ThemedText variant="headline" style={{ color: '#FF3B30', fontWeight: '800', fontSize: 18 }}>
+                  {formatPrice(discountInfo.sevenElevenPrice)}
+                </ThemedText>
+                <ThemedText variant="caption" style={{ color: theme.success, fontWeight: '600' }}>
+                  現省 {formatPrice(discountInfo.savingsSeven)}
+                </ThemedText>
+              </View>
+
+              <View style={[styles.expiringDivider, { backgroundColor: theme.separator }]} />
+
+              <View style={styles.expiringPill}>
+                <ThemedText variant="caption" secondary>
+                  全家友善時光 (7折)
+                </ThemedText>
+                <ThemedText variant="headline" style={{ color: '#FF3B30', fontWeight: '800', fontSize: 18 }}>
+                  {formatPrice(discountInfo.familyMartPrice)}
+                </ThemedText>
+                <ThemedText variant="caption" style={{ color: theme.success, fontWeight: '600' }}>
+                  現省 {formatPrice(discountInfo.savingsFamily)}
+                </ThemedText>
+              </View>
+            </View>
+          </Glass>
+        )}
 
         {/* 各通路比價 */}
         <SectionTitle title="各通路價格" loading={remoteLoading} />
@@ -300,6 +349,36 @@ const styles = StyleSheet.create({
   addMore: { borderRadius: Radius.pill, alignSelf: 'center' },
   addMoreInner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingVertical: 12, paddingHorizontal: Spacing.four },
   offCard: { borderRadius: Radius.lg, padding: Spacing.three, gap: Spacing.two },
+  expiringCard: {
+    borderRadius: Radius.lg,
+    padding: Spacing.three,
+    gap: Spacing.two,
+  },
+  expiringCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  expiringTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  expiringRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingTop: Spacing.one,
+  },
+  expiringPill: {
+    alignItems: 'center',
+    gap: 2,
+    flex: 1,
+  },
+  expiringDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 36,
+  },
   infoRow: { flexDirection: 'row', gap: Spacing.three },
   infoLabel: { width: 80 },
   infoValue: { flex: 1 },

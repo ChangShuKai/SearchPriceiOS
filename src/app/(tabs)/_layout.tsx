@@ -6,6 +6,13 @@ import { NativeTabs } from 'expo-router/native-tabs';
 export default function TabLayout() {
   return (
     <NativeTabs minimizeBehavior="never">
+      <NativeTabs.Trigger name="discount">
+        <NativeTabs.Trigger.Label>即期品</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'tag', selected: 'tag.fill' }}
+          md="local_offer"
+        />
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>掃描比價</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="barcode.viewfinder" md="barcode_scanner" />

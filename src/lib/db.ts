@@ -58,7 +58,7 @@ export function getDb(): Promise<SQLite.SQLiteDatabase> {
 
       // 檢查是否已載入初始離線資料庫（首開秒用、斷網可用）
       try {
-        const seedMeta = await db.getFirstAsync<{ value: string }>('SELECT value FROM meta WHERE key = ?', 'seed_loaded_v1');
+        const seedMeta = await db.getFirstAsync<{ value: string }>('SELECT value FROM meta WHERE key = ?', 'seed_loaded_v7');
         if (!seedMeta?.value) {
           const seed = require('@/constants/seed-data.json') as PriceReport[];
           if (Array.isArray(seed) && seed.length > 0) {
@@ -83,7 +83,7 @@ export function getDb(): Promise<SQLite.SQLiteDatabase> {
                 );
               }
             });
-            await db.runAsync('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', 'seed_loaded_v1', '1');
+            await db.runAsync('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', 'seed_loaded_v7', '1');
           }
         }
       } catch (err) {

@@ -10,6 +10,7 @@ export const STORE_ICONS: Record<string, number> = {
   'rt-mart': require('@/assets/stores/rt-mart.png'),
   watsons: require('@/assets/stores/watsons.png'),
   cosmed: require('@/assets/stores/cosmed.png'),
+  poya: require('@/assets/stores/poya.png'),
   other: require('@/assets/stores/other.png'),
 };
 

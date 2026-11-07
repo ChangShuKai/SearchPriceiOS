@@ -37,7 +37,7 @@ type OsmElement = {
 };
 
 /** 透過 OpenStreetMap 查詢附近的連鎖門市，依距離排序。 */
-async function queryNearbyStores(lat: number, lng: number): Promise<NearbyStore[]> {
+export async function queryNearbyStores(lat: number, lng: number): Promise<NearbyStore[]> {
   const q = `[out:json][timeout:10];
 nwr(around:${RADIUS_M},${lat},${lng})[shop~"^(convenience|supermarket|wholesale|chemist|department_store|general|variety_store)$"];
 out center tags 50;`;
