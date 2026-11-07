@@ -30,7 +30,6 @@ jobs:
       - name: Build Unsigned App
         run: |
           cd ios
-          # 精準解析 xcworkspace 內部真實 Scheme 名稱，避免誤抓 contentsdata
           SCHEME_NAME=$(xcodebuild -workspace SearchPrice.xcworkspace -list -json | python3 -c "import sys, json; data=json.load(sys.stdin); schemes=data.get('workspace', {}).get('schemes', []); print(schemes[0] if schemes else 'SearchPrice')")
           echo "Building Scheme: $SCHEME_NAME"
 
@@ -46,12 +45,17 @@ jobs:
       - name: Package to IPA
         run: |
           mkdir -p Payload
-          # 尋找產出的 .app 並打包至 Payload
-          APP_PATH=$(find ios/build/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
+          # 全局搜尋編譯產出的 .app 資料夾（排除 Pods 內部產物）
+          APP_PATH=$(find . -type d -name "*.app" ! -path "*/Pods/*" | head -n 1)
+          
+          echo "Found App at: $APP_PATH"
           if [ -z "$APP_PATH" ]; then
-            echo "Error: .app file not found!"
+            echo "Error: .app file not found in entire repository!"
+            echo "Current files in build directory:"
+            find . -name "*.app" || true
             exit 1
           fi
+          
           cp -r "$APP_PATH" Payload/
           zip -r SearchPriceiOS.ipa Payload
 
