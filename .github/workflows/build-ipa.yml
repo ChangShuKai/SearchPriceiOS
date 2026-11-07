@@ -1,10 +1,10 @@
-name: Build iOS IPA and Android APK (Free GitHub Runner)
+name: Build SearchPrice iOS IPA and Android APK
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-all:
     runs-on: macos-latest
     steps:
       - name: Checkout Code
@@ -22,16 +22,15 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Install Dependencies
+      - name: Install Node Dependencies
         run: npm install
 
-      # 1. 本地生成原生 Android 與 iOS 代碼（不走 Expo 雲端）
+      # --------------------------------------------------
+      # 1. 產生原生目錄並編譯 Android APK
+      # --------------------------------------------------
       - name: Prebuild Native Folders
         run: npx expo prebuild --clean
 
-      # --------------------------------------------------
-      # 2. 編譯 Android Release APK
-      # --------------------------------------------------
       - name: Build Android Release APK
         run: |
           cd android
@@ -39,15 +38,12 @@ jobs:
           ./gradlew assembleRelease --no-daemon
           cd ..
           
-          APK_FILE=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
-          if [ -z "$APK_FILE" ]; then
-            APK_FILE=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
-          fi
-          echo "Found APK: $APK_FILE"
+          APK_FILE=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          echo "Found Android APK: $APK_FILE"
           cp "$APK_FILE" SearchPrice.apk
 
       # --------------------------------------------------
-      # 3. 編譯 iOS 原生未簽名 IPA
+      # 2. 編譯 iOS 原生代碼並封裝 IPA
       # --------------------------------------------------
       - name: Install CocoaPods
         run: |
@@ -59,21 +55,24 @@ jobs:
         run: |
           cd ios
           
-          # 找出 scheme 名稱，若無則抓 Target 名稱
-          SCHEME_NAME=$(xcodebuild -workspace SearchPrice.xcworkspace -list -json | python3 -c "import sys, json; data=json.load(sys.stdin); schemes=data.get('workspace', {}).get('schemes', []); print(schemes[0] if schemes else 'SearchPrice')")
-          echo "Compiling Scheme: $SCHEME_NAME"
+          # 列出所有 Schemes 供排查確認
+          xcodebuild -list
+          
+          # 自動過濾並選取主 Scheme（排除 Pods、Tests、contentsdata）
+          SCHEME_NAME=$(xcodebuild -workspace SearchPrice.xcworkspace -list -json | python3 -c "import sys, json; data=json.load(sys.stdin); schemes=data.get('workspace', {}).get('schemes', []); main_schemes=[s for s in schemes if not any(x in s for x in ['Pods', 'Tests', 'contentsdata'])]; print(main_schemes[0] if main_schemes else 'SearchPrice')")
+          echo "Target Scheme selected: $SCHEME_NAME"
 
-          # 建立明確的建置輸出目標目錄
-          mkdir -p build_output
+          # 建立目標輸出目錄
+          mkdir -p output_build
 
-          # 核心編譯：明確指定 CONFIGURATION_BUILD_DIR，強制 Xcode 將產出的 .app 寫入該目錄
-          xcodebuild \
+          # 執行完整 Release Build，指定輸出路徑與架構
+          xcodebuild build \
             -workspace SearchPrice.xcworkspace \
             -scheme "$SCHEME_NAME" \
             -configuration Release \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
-            CONFIGURATION_BUILD_DIR="$(pwd)/build_output" \
+            SYMROOT="$(pwd)/output_build" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -83,25 +82,30 @@ jobs:
 
       - name: Package iOS IPA
         run: |
-          # 檢查 build_output 內的 .app
-          APP_DIR=$(find ios/build_output -type d -name "*.app" -maxdepth 1 | head -n 1)
+          echo "Scanning output files:"
+          find ios/output_build -name "*.app" || true
+
+          # 尋找由 xcodebuild 產出的 Release-iphoneos 目錄下的 .app
+          APP_PATH=$(find ios/output_build/Release-iphoneos -maxdepth 1 -name "*.app" | head -n 1)
           
-          if [ -z "$APP_DIR" ]; then
-            echo "Searching all .app fallback:"
-            find . -type d -name "*.app" ! -path "*/Pods/*"
-            echo "Error: Xcode did not output .app to ios/build_output."
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find . -name "*.app" ! -path "*/Pods/*" | head -n 1)
+          fi
+
+          echo "Selected Target App Path: $APP_PATH"
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: Xcode did not produce any .app bundle."
             exit 1
           fi
 
-          echo "Found Target App: $APP_DIR"
           mkdir -p Payload
-          cp -r "$APP_DIR" Payload/
+          cp -r "$APP_PATH" Payload/
           zip -r SearchPrice.ipa Payload
 
       # --------------------------------------------------
-      # 4. 一鍵上傳雙端成品
+      # 3. 同步上傳雙端成品
       # --------------------------------------------------
-      - name: Upload Artifacts
+      - name: Upload Both Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: SearchPrice-Builds
