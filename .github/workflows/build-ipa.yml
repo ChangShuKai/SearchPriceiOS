@@ -27,41 +27,45 @@ jobs:
           cd ios
           pod install
 
-      - name: Archive Unsigned App
+      - name: Archive App
         run: |
           cd ios
           SCHEME_NAME=$(xcodebuild -workspace SearchPrice.xcworkspace -list -json | python3 -c "import sys, json; data=json.load(sys.stdin); schemes=data.get('workspace', {}).get('schemes', []); print(schemes[0] if schemes else 'SearchPrice')")
-          echo "Archiving Scheme: $SCHEME_NAME"
+          echo "Target Scheme: $SCHEME_NAME"
 
-          # 使用 archive 模式，強制產生完整的應用程式本體
+          # 建立輸出目錄
+          mkdir -p build
+
+          # 執行 archive，加入允許 ad-hoc / 無簽名參數
           xcodebuild archive \
             -workspace SearchPrice.xcworkspace \
             -scheme "$SCHEME_NAME" \
             -configuration Release \
             -destination "generic/platform=iOS" \
-            -archivePath "$PWD/build/SearchPrice.xcarchive" \
+            -archivePath "build/SearchPrice.xcarchive" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+          echo "Checking archive contents:"
+          ls -la build/SearchPrice.xcarchive/Products/Applications || true
 
       - name: Package to IPA
         run: |
-          # xcarchive 產出的 .app 固定位於 Products/Applications/
-          ARCHIVE_APP_DIR="ios/build/SearchPrice.xcarchive/Products/Applications"
+          mkdir -p Payload
           
-          if [ -d "$ARCHIVE_APP_DIR" ]; then
-            APP_PATH=$(find "$ARCHIVE_APP_DIR" -name "*.app" -maxdepth 1 | head -n 1)
-          else
-            APP_PATH=$(find . -name "*.app" ! -path "*/Pods/*" | head -n 1)
-          fi
-
-          echo "Target App Path: $APP_PATH"
+          # 精確抓取剛剛產出的 .app
+          APP_PATH=$(find ios/build/SearchPrice.xcarchive/Products/Applications -name "*.app" -maxdepth 1 2>/dev/null | head -n 1)
+          
           if [ -z "$APP_PATH" ]; then
-            echo "Error: Could not locate .app in archive or workspace."
+            echo "Searching all .app in workspace as fallback:"
+            find . -name "*.app"
+            echo "Error: .app file not found!"
             exit 1
           fi
 
-          mkdir -p Payload
+          echo "Packaging: $APP_PATH"
           cp -r "$APP_PATH" Payload/
           zip -r SearchPriceiOS.ipa Payload
 
@@ -71,3 +75,4 @@ jobs:
           name: SearchPriceiOS-ipa
           path: SearchPriceiOS.ipa
           retention-days: 7
+          
