@@ -1,62 +1,19 @@
-name: Build SearchPrice (Android and iOS)
+name: Build SearchPrice iOS IPA
 
 on:
   workflow_dispatch:
 
 jobs:
-  # ------------------------------------------------------------------
-  # 任務 1：Android APK 編譯（Linux 並行執行）
-  # ------------------------------------------------------------------
-  build-android:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Setup Java (JDK 17)
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: Install Dependencies
-        run: npm install
-
-      - name: Prebuild Android
-        run: npx expo prebuild --platform android --clean
-
-      - name: Build Android Release APK
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
-          cd ..
-          
-          APK_FILE=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
-          echo "Found APK: $APK_FILE"
-          cp "$APK_FILE" SearchPrice.apk
-
-      - name: Upload Android APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: SearchPrice-Android-APK
-          path: SearchPrice.apk
-          retention-days: 7
-
-  # ------------------------------------------------------------------
-  # 任務 2：iOS IPA 編譯（安全注入 post_install，解決模組衝突）
-  # ------------------------------------------------------------------
   build-ios:
-    runs-on: macos-latest
+    runs-on: macos-14
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: |
+          # 切換至穩定版 Xcode 15.4，避開 Xcode 16 Clang ScanDependencies Bug
+          sudo xcode-select -s /Applications/Xcode_15.4.app
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -67,36 +24,12 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Prebuild iOS
+      - name: Prebuild iOS Native Project
         run: npx expo prebuild --platform ios --clean
 
-      - name: Patch Podfile & Install CocoaPods
+      - name: Install CocoaPods
         run: |
           cd ios
-          # 使用 Python 將設定安全插入 Expo 原有的 post_install 區塊內，不建立第二個 hook
-          python3 -c "
-          with open('Podfile', 'r') as f:
-              content = f.read()
-          
-          patch = '''
-              installer.pods_project.targets.each do |target|
-                target.build_configurations.each do |config|
-                  config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ''
-                  config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
-                  config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
-                end
-              end
-          '''
-          
-          if 'post_install do |installer|' in content:
-              content = content.replace('post_install do |installer|', 'post_install do |installer|' + patch)
-              with open('Podfile', 'w') as f:
-                  f.write(content)
-              print('Successfully patched existing post_install hook.')
-          else:
-              print('Warning: post_install hook not found, skipping patch.')
-          "
-
           pod install
           cd ..
 
@@ -104,15 +37,17 @@ jobs:
         run: |
           cd ios
           
+          # 自動取得正確的 Target / Scheme 名稱
           TARGET_NAME=$(xcodebuild -list -json | python3 -c "import sys, json; data=json.load(sys.stdin); targets=data.get('project', {}).get('targets', []); print(targets[0] if targets else 'SearchPrice')")
-          echo "Building Target: $TARGET_NAME"
+          echo "Building Target Scheme: $TARGET_NAME"
 
           mkdir -p build_output
           export NODE_BINARY=$(which node)
 
+          # 清理舊 DerivedData
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
 
-          # 透過 -configuration Release 與免簽名參數構建
+          # 執行免簽名編譯，禁用 Clang 顯式模組掃描
           xcodebuild build \
             -workspace SearchPrice.xcworkspace \
             -scheme "$TARGET_NAME" \
@@ -125,12 +60,16 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            CLANG_ENABLE_EXPLICIT_MODULES=NO
 
           cd ..
 
       - name: Package iOS IPA
         run: |
+          echo "Scanning output directory:"
+          ls -la ios/build_output || true
+
           APP_PATH=$(find ios/build_output -type d -name "*.app" -maxdepth 1 | head -n 1)
           if [ -z "$APP_PATH" ]; then
             APP_PATH=$(find . -type d -name "*.app" ! -path "*/Pods/*" | head -n 1)
