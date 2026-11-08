@@ -5,15 +5,18 @@ on:
 
 jobs:
   build-ios:
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Select Xcode Version
         run: |
-          # 切換至穩定版 Xcode 15.4，避開 Xcode 16 Clang ScanDependencies Bug
-          sudo xcode-select -s /Applications/Xcode_15.4.app
+          # 檢查可用的 Xcode 版本，若有 15.4 則優先使用，否則使用預設
+          if [ -d "/Applications/Xcode_15.4.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_15.4.app
+          fi
+          xcodebuild -version
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -37,17 +40,15 @@ jobs:
         run: |
           cd ios
           
-          # 自動取得正確的 Target / Scheme 名稱
           TARGET_NAME=$(xcodebuild -list -json | python3 -c "import sys, json; data=json.load(sys.stdin); targets=data.get('project', {}).get('targets', []); print(targets[0] if targets else 'SearchPrice')")
           echo "Building Target Scheme: $TARGET_NAME"
 
           mkdir -p build_output
           export NODE_BINARY=$(which node)
 
-          # 清理舊 DerivedData
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
 
-          # 執行免簽名編譯，禁用 Clang 顯式模組掃描
+          # 關閉 Explicit Modules、關閉 Index Store、停用 Clang 依賴掃描快取
           xcodebuild build \
             -workspace SearchPrice.xcworkspace \
             -scheme "$TARGET_NAME" \
@@ -61,7 +62,9 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             COMPILER_INDEX_STORE_ENABLE=NO \
-            CLANG_ENABLE_EXPLICIT_MODULES=NO
+            CLANG_ENABLE_EXPLICIT_MODULES=NO \
+            SWIFT_SCAN_DEPENDENCIES_IN_PROCESS=YES \
+            OTHER_CFLAGS="-fno-modules-validate-once-per-build-session"
 
           cd ..
 
