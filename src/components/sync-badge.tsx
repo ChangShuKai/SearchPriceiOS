@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { SymbolView } from 'expo-symbols';
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Glass } from '@/components/glass';
 import { ThemedText } from '@/components/themed-text';
@@ -10,7 +10,13 @@ import { useTheme } from '@/hooks/use-theme';
 import { syncNow } from '@/lib/sync';
 
 /** 顯示雲端與本地資料庫筆數，點擊可手動觸發同步 */
-export function SyncBadge({ onCamera = true }: { onCamera?: boolean }) {
+export function SyncBadge({
+  onCamera = true,
+  compact = false,
+}: {
+  onCamera?: boolean;
+  compact?: boolean;
+}) {
   const theme = useTheme();
   const s = useSyncState();
   const color = onCamera ? '#fff' : theme.text;
@@ -40,6 +46,22 @@ export function SyncBadge({ onCamera = true }: { onCamera?: boolean }) {
     void syncNow(true);
   };
 
+  if (compact) {
+    return (
+      <Glass variant={onCamera ? 'clear' : 'regular'} interactive style={styles.compactPill}>
+        <Pressable
+          style={styles.compactInner}
+          onPress={handlePress}
+          hitSlop={6}
+          accessibilityLabel={label}
+          accessibilityRole="button">
+          <SymbolView name={icon} size={16} tintColor={s.status === 'idle' ? '#34C759' : color} />
+          {s.pending > 0 && <View style={[styles.pendingDot, { backgroundColor: '#F5A200' }]} />}
+        </Pressable>
+      </Glass>
+    );
+  }
+
   return (
     <Glass variant={onCamera ? 'clear' : 'regular'} interactive style={styles.pill}>
       <Pressable style={styles.inner} onPress={handlePress}>
@@ -61,5 +83,27 @@ const styles = StyleSheet.create({
     gap: Spacing.one + 2,
     paddingHorizontal: 12,
     paddingVertical: 8,
+  },
+  compactPill: {
+    borderRadius: Radius.pill,
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compactInner: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  pendingDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
 });

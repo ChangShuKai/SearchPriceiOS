@@ -293,7 +293,9 @@ export default function AddScreen() {
             { paddingTop: insets.top + Spacing.two, paddingBottom: BottomTabInset + insets.bottom + Spacing.four },
           ]}>
           <View style={styles.titleRow}>
-            <ThemedText variant="largeTitle">新增價格</ThemedText>
+            <ThemedText variant="largeTitle" style={styles.titleText}>
+              新增價格
+            </ThemedText>
             <View style={styles.headerRight}>
               <Pressable
                 onPress={() => {
@@ -309,7 +311,7 @@ export default function AddScreen() {
                 accessibilityLabel="我的上傳">
                 <SymbolView
                   name={{ ios: 'clock.arrow.circlepath', android: 'history' }}
-                  size={15}
+                  size={14}
                   tintColor={theme.tint}
                 />
                 <ThemedText variant="caption" style={{ color: theme.tint, fontWeight: '700' }}>
@@ -323,7 +325,7 @@ export default function AddScreen() {
                   </View>
                 )}
               </Pressable>
-              <SyncBadge onCamera={false} />
+              <SyncBadge onCamera={false} compact />
             </View>
           </View>
 
@@ -528,29 +530,42 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   white: { color: '#fff' },
   content: { paddingHorizontal: Spacing.three, gap: Spacing.two },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  titleText: {
+    fontSize: 28,
+    fontWeight: '800',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   myUploadsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderRadius: Radius.pill,
   },
   uploadBadge: {
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
   },
   uploadBadgeText: {
     color: '#fff',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
-    lineHeight: 12,
+    lineHeight: 13,
   },
   cameraBox: { height: 180, borderRadius: Radius.lg, overflow: 'hidden', backgroundColor: '#000' },
   cameraCenter: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
