@@ -12,9 +12,11 @@ jobs:
 
       - name: Select Xcode Version
         run: |
-          # 檢查可用的 Xcode 版本，若有 15.4 則優先使用，否則使用預設
+          # 檢查是否有 Xcode 15 可切換，有的話切換，沒有則使用當前環境
           if [ -d "/Applications/Xcode_15.4.app" ]; then
             sudo xcode-select -s /Applications/Xcode_15.4.app
+          elif [ -d "/Applications/Xcode_15.2.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_15.2.app
           fi
           xcodebuild -version
 
@@ -40,6 +42,7 @@ jobs:
         run: |
           cd ios
           
+          # 自動取得正確的 Target Scheme 名稱
           TARGET_NAME=$(xcodebuild -list -json | python3 -c "import sys, json; data=json.load(sys.stdin); targets=data.get('project', {}).get('targets', []); print(targets[0] if targets else 'SearchPrice')")
           echo "Building Target Scheme: $TARGET_NAME"
 
@@ -48,7 +51,7 @@ jobs:
 
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
 
-          # 關閉 Explicit Modules、關閉 Index Store、停用 Clang 依賴掃描快取
+          # 移除無效的 CFLAGS，使用標準參數編譯
           xcodebuild build \
             -workspace SearchPrice.xcworkspace \
             -scheme "$TARGET_NAME" \
@@ -63,8 +66,7 @@ jobs:
             PROVISIONING_PROFILE_SPECIFIER="" \
             COMPILER_INDEX_STORE_ENABLE=NO \
             CLANG_ENABLE_EXPLICIT_MODULES=NO \
-            SWIFT_SCAN_DEPENDENCIES_IN_PROCESS=YES \
-            OTHER_CFLAGS="-fno-modules-validate-once-per-build-session"
+            SWIFT_SCAN_DEPENDENCIES_IN_PROCESS=YES
 
           cd ..
 
