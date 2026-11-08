@@ -25,6 +25,7 @@ export const STORE_CHAINS: StoreChain[] = [
   { id: 'watsons', name: '屈臣氏', color: '#00A19A', icon: 'cross.case.fill', patterns: [/watsons/i, /屈臣氏/] },
   { id: 'cosmed', name: '康是美', color: '#E4007F', icon: 'cross.fill', patterns: [/cosmed/i, /康是美/] },
   { id: 'poya', name: '寶雅', color: '#ED1B67', icon: 'sparkles', patterns: [/poya/i, /寶雅/] },
+  { id: 'pchome', name: 'PChome 24h', color: '#DE2020', icon: 'shippingbox.fill', patterns: [/pchome/i, /24h/i] },
   { id: 'other', name: '其他', color: '#8E8E93', icon: 'storefront.fill', patterns: [] },
 ];
 

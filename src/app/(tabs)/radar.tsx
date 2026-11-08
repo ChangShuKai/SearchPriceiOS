@@ -49,6 +49,7 @@ const CHAIN_NAME_MAP: Record<string, string> = {
   watsons: '屈臣氏',
   cosmed: '康是美',
   costco: '好市多',
+  pchome: 'PChome 24h',
   'rt-mart': '大潤發',
   simplemart: '美廉社',
   '7-eleven': '7-11',

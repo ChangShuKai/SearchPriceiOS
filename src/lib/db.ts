@@ -306,6 +306,71 @@ export async function countUnsynced(): Promise<number> {
   return row?.n ?? 0;
 }
 
+export type UserUploadRecord = PriceReport & {
+  synced: boolean;
+};
+
+/** 取得當前使用者／裝置上傳的所有價格回報紀錄（依回報時間最新排序） */
+export async function getMyUploads(customDeviceId?: string | null): Promise<UserUploadRecord[]> {
+  const db = await getDb();
+  const deviceId = customDeviceId ?? (await getMeta('device_id'));
+
+  let rows: LocalRow[] = [];
+  if (deviceId) {
+    rows = await db.getAllAsync<LocalRow>(
+      `SELECT * FROM price_reports 
+       WHERE device_id = ? OR (device_id IS NULL AND synced = 0)
+       ORDER BY reported_at DESC`,
+      deviceId,
+    );
+  } else {
+    rows = await db.getAllAsync<LocalRow>(
+      `SELECT * FROM price_reports 
+       WHERE synced = 0
+       ORDER BY reported_at DESC`,
+    );
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    synced: r.synced === 1,
+  }));
+}
+
+/** 取得當前使用者／裝置上傳的紀錄總數 */
+export async function countMyUploads(customDeviceId?: string | null): Promise<number> {
+  const db = await getDb();
+  const deviceId = customDeviceId ?? (await getMeta('device_id'));
+
+  if (deviceId) {
+    const row = await db.getFirstAsync<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM price_reports 
+       WHERE device_id = ? OR (device_id IS NULL AND synced = 0)`,
+      deviceId,
+    );
+    return row?.n ?? 0;
+  }
+  const row = await db.getFirstAsync<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM price_reports WHERE synced = 0`,
+  );
+  return row?.n ?? 0;
+}
+
+/** 刪除使用者先前上傳的一筆價格回報紀錄 */
+export async function deleteMyUpload(id: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM price_reports WHERE id = ?', id);
+
+  const cat = getMemoryCatalog();
+  cat.byId.delete(id);
+  const idx = cat.allReports.findIndex((r) => r.id === id);
+  if (idx >= 0) cat.allReports.splice(idx, 1);
+  for (const list of cat.byBarcode.values()) {
+    const bIdx = list.findIndex((r) => r.id === id);
+    if (bIdx >= 0) list.splice(bIdx, 1);
+  }
+}
+
 /** 同步立即取得某條碼在記憶體母庫中的各通路價格（0ms 無延遲）。 */
 export function getInstantPricesByChain(barcode: string): (PriceReport & { report_count: number })[] {
   const cat = getMemoryCatalog();

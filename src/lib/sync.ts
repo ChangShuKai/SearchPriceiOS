@@ -79,18 +79,23 @@ async function download() {
   const savedCursor = await getMeta('remote_cursor');
   let cursor = savedCursor && savedCursor > seedCursor ? savedCursor : seedCursor;
 
-  const { data, error } = await supabase
-    .from('price_reports')
-    .select(COLUMNS)
-    .gt('reported_at', cursor)
-    .order('reported_at', { ascending: true })
-    .limit(PAGE);
-  if (error) throw error;
-  if (!data || data.length === 0) return;
-  await upsertRemoteReports(data as PriceReport[]);
-  const latest = (data[data.length - 1] as { reported_at?: string; created_at?: string }).reported_at;
-  if (latest) {
-    await setMeta('remote_cursor', latest);
+  // 支援多次分頁拉取，最多連續拉取 10 頁（5,000 筆），確保伺服器有批量新資料時一次抓取完整
+  for (let page = 0; page < 10; page++) {
+    const { data, error } = await supabase
+      .from('price_reports')
+      .select(COLUMNS)
+      .gt('reported_at', cursor)
+      .order('reported_at', { ascending: true })
+      .limit(PAGE);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    await upsertRemoteReports(data as PriceReport[]);
+    const latest = (data[data.length - 1] as { reported_at?: string; created_at?: string }).reported_at;
+    if (latest) {
+      cursor = latest;
+      await setMeta('remote_cursor', latest);
+    }
+    if (data.length < PAGE) break;
   }
 }
 
@@ -143,6 +148,25 @@ export async function fetchRemoteBarcode(barcode: string): Promise<void> {
   const res = await Promise.race([queryPromise, timeoutPromise]);
   if (!res || res.error) return;
   await upsertRemoteReports((res.data ?? []) as PriceReport[]);
+}
+
+/** 查詢本裝置在雲端已儲存的回報（可供「我的上傳」頁面重新整理時同步補充）。 */
+export async function fetchMyRemoteUploads(deviceId: string): Promise<void> {
+  if (!supabase || !deviceId) return;
+  try {
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
+    const queryPromise = supabase
+      .from('price_reports')
+      .select(COLUMNS)
+      .eq('device_id', deviceId)
+      .order('reported_at', { ascending: false })
+      .limit(200);
+    const res = await Promise.race([queryPromise, timeoutPromise]);
+    if (!res || res.error || !res.data) return;
+    await upsertRemoteReports(res.data as PriceReport[]);
+  } catch {
+    // 網路異常或超時忽略
+  }
 }
 
 let started = false;

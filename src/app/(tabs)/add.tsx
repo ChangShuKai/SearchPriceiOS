@@ -30,7 +30,7 @@ import { SyncBadge } from '@/components/sync-badge';
 import { ThemedText } from '@/components/themed-text';
 import { BottomTabInset, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { getProductNamesForBarcode, insertLocalReport, searchProductNames } from '@/lib/db';
+import { countMyUploads, getProductNamesForBarcode, insertLocalReport, searchProductNames } from '@/lib/db';
 import { detectNearbyStores, type NearbyStore } from '@/lib/location';
 import { isExpoGo, isOcrAvailable, recognizeProductText } from '@/lib/ocr';
 import { contributeToOpenFoodFacts, fetchOpenFoodFacts } from '@/lib/openfoodfacts';
@@ -68,10 +68,12 @@ export default function AddScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [justSaved, setJustSaved] = useState<string | null>(null);
   const [prevParam, setPrevParam] = useState<string | undefined>(undefined);
+  const [myUploadCount, setMyUploadCount] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
       setFocused(true);
+      void countMyUploads().then(setMyUploadCount);
       return () => setFocused(false);
     }, []),
   );
@@ -258,6 +260,7 @@ export default function AddScreen() {
       // 同步回饋至開放資料庫，豐富往後的條碼庫
       void contributeToOpenFoodFacts(barcode, name.trim());
       setJustSaved(barcode);
+      setMyUploadCount((c) => c + 1);
       setPrice('');
       setName('');
       setBarcode('');
@@ -291,7 +294,37 @@ export default function AddScreen() {
           ]}>
           <View style={styles.titleRow}>
             <ThemedText variant="largeTitle">新增價格</ThemedText>
-            <SyncBadge onCamera={false} />
+            <View style={styles.headerRight}>
+              <Pressable
+                onPress={() => {
+                  void Haptics.selectionAsync();
+                  router.push('/my-uploads' as any);
+                }}
+                style={({ pressed }) => [
+                  styles.myUploadsBtn,
+                  { backgroundColor: theme.tint + '18', opacity: pressed ? 0.7 : 1 },
+                ]}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel="我的上傳">
+                <SymbolView
+                  name={{ ios: 'clock.arrow.circlepath', android: 'history' }}
+                  size={15}
+                  tintColor={theme.tint}
+                />
+                <ThemedText variant="caption" style={{ color: theme.tint, fontWeight: '700' }}>
+                  我的上傳
+                </ThemedText>
+                {myUploadCount > 0 && (
+                  <View style={[styles.uploadBadge, { backgroundColor: theme.tint }]}>
+                    <ThemedText variant="footnote" style={styles.uploadBadgeText}>
+                      {myUploadCount > 99 ? '99+' : myUploadCount}
+                    </ThemedText>
+                  </View>
+                )}
+              </Pressable>
+              <SyncBadge onCamera={false} />
+            </View>
           </View>
 
             {/* 相機：掃條碼 + 拍照辨識 */}
@@ -496,6 +529,29 @@ const styles = StyleSheet.create({
   white: { color: '#fff' },
   content: { paddingHorizontal: Spacing.three, gap: Spacing.two },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+  myUploadsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: Radius.pill,
+  },
+  uploadBadge: {
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  uploadBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 12,
+  },
   cameraBox: { height: 180, borderRadius: Radius.lg, overflow: 'hidden', backgroundColor: '#000' },
   cameraCenter: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   cameraHint: { position: 'absolute', top: 10, left: 10, borderRadius: Radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
