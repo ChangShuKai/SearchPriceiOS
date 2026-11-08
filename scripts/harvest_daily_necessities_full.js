@@ -1125,20 +1125,21 @@ async function main() {
     return (b.imageUrl ? 1 : 0) - (a.imageUrl ? 1 : 0);
   });
 
-  // Keep up to 600 items per category (up to 2,400 daily necessity products total)
+  // Keep up to 750 items per category (up to 3,000 daily necessity products total)
   const countsByCat = {};
-  const subCounts = { battery: 0, floss: 0, bodywash: 0 };
+  const subCounts = { battery: 0, floss: 0, bodywash: 0, watsons: 0 };
   const balancedDaily = [];
 
   for (const item of dailyList) {
     const c = item.category;
     countsByCat[c] = (countsByCat[c] || 0) + 1;
-    if (countsByCat[c] <= 600) {
+    if (countsByCat[c] <= 750) {
       const { _chainCount, _isKeyStaple, ...cleanItem } = item;
       balancedDaily.push(cleanItem);
       if (/電池/.test(cleanItem.name)) subCounts.battery++;
       if (/牙線|牙間刷|齒間/.test(cleanItem.name)) subCounts.floss++;
       if (/沐浴|香浴|潔膚露|肥皂|香皂|洗手/.test(cleanItem.name)) subCounts.bodywash++;
+      if (cleanItem.prices.watsons) subCounts.watsons++;
     }
   }
 
