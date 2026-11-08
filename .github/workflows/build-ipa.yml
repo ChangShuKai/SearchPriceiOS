@@ -10,16 +10,6 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Select Xcode Version
-        run: |
-          # 檢查是否有 Xcode 15 可切換，有的話切換，沒有則使用當前環境
-          if [ -d "/Applications/Xcode_15.4.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_15.4.app
-          elif [ -d "/Applications/Xcode_15.2.app" ]; then
-            sudo xcode-select -s /Applications/Xcode_15.2.app
-          fi
-          xcodebuild -version
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -32,29 +22,42 @@ jobs:
       - name: Prebuild iOS Native Project
         run: npx expo prebuild --platform ios --clean
 
-      - name: Install CocoaPods
+      - name: Patch Podfile & Install CocoaPods
         run: |
           cd ios
+          # 停用 Pods 的模組生成，防止 dummy.m 編譯崩潰
+          python3 -c "
+          with open('Podfile', 'r') as f:
+              content = f.read()
+
+          patch = '''
+              installer.pods_project.targets.each do |target|
+                target.build_configurations.each do |config|
+                  config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
+                  config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ''
+                  config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+                  config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+                end
+              end
+          '''
+          if 'post_install do |installer|' in content:
+              content = content.replace('post_install do |installer|', 'post_install do |installer|' + patch)
+              with open('Podfile', 'w') as f:
+                  f.write(content)
+          "
           pod install
           cd ..
 
       - name: Build iOS Application
         run: |
           cd ios
-          
-          # 自動取得正確的 Target Scheme 名稱
-          TARGET_NAME=$(xcodebuild -list -json | python3 -c "import sys, json; data=json.load(sys.stdin); targets=data.get('project', {}).get('targets', []); print(targets[0] if targets else 'SearchPrice')")
-          echo "Building Target Scheme: $TARGET_NAME"
-
           mkdir -p build_output
           export NODE_BINARY=$(which node)
 
-          rm -rf ~/Library/Developer/Xcode/DerivedData/*
-
-          # 移除無效的 CFLAGS，使用標準參數編譯
+          # 直接針對 SearchPrice 專案與 Scheme 構建，透過 ONLY_ACTIVE_ARCH=NO 與明確關閉 User Script Sandboxing
           xcodebuild build \
             -workspace SearchPrice.xcworkspace \
-            -scheme "$TARGET_NAME" \
+            -scheme SearchPrice \
             -configuration Release \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
@@ -65,16 +68,12 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             COMPILER_INDEX_STORE_ENABLE=NO \
-            CLANG_ENABLE_EXPLICIT_MODULES=NO \
-            SWIFT_SCAN_DEPENDENCIES_IN_PROCESS=YES
+            ENABLE_USER_SCRIPT_SANDBOXING=NO
 
           cd ..
 
       - name: Package iOS IPA
         run: |
-          echo "Scanning output directory:"
-          ls -la ios/build_output || true
-
           APP_PATH=$(find ios/build_output -type d -name "*.app" -maxdepth 1 | head -n 1)
           if [ -z "$APP_PATH" ]; then
             APP_PATH=$(find . -type d -name "*.app" ! -path "*/Pods/*" | head -n 1)
