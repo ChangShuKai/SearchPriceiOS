@@ -1,7 +1,5 @@
 import * as Location from 'expo-location';
 
-import { queryNearbyStores, type NearbyStore } from '@/lib/location';
-
 export type ChainChoice = '7-eleven' | 'familymart' | 'pxmart' | 'poya';
 
 export type DiscountTimeStatus = {
@@ -14,7 +12,7 @@ export type DiscountTimeStatus = {
  * 檢查當前是否處於各通路官方即期品 / 惜食特惠時段
  * - 7-Eleven (i珍食 65折)：每日 10:00–17:00、20:00–03:00
  * - 全家 (友善時光 7折)：每日 10:00–17:00、17:00–00:00
- * - 全聯 (惜食地圖 6折·8折)：每日 11:00–14:00（幸福熱便當）、16:00–22:00（生鮮/美味堂/阪急麵包/甜點 6折~8折）
+ * - 全聯 (惜食地圖 6折·8折)：每日 11:00–14:00、16:00–22:00
  * - 寶雅 (門市限時特賣)：每日營業時段 10:00–22:30
  */
 export function checkDiscountTimeStatus(chain: ChainChoice, now: Date = new Date()): DiscountTimeStatus {
@@ -26,11 +24,11 @@ export function checkDiscountTimeStatus(chain: ChainChoice, now: Date = new Date
     const isDiscountTime = (hour >= 10 && hour < 17) || hour >= 20 || hour < 3;
     let nextWindowText = '目前為 i珍食 65 折特惠時段';
     if (!isDiscountTime) {
-      nextWindowText = hour >= 3 && hour < 10 ? '下一波 i珍食將於 10:00 開放' : '下一波 i珍食將於 20:00 開放';
+      nextWindowText = hour >= 3 && hour < 10 ? '下一波 10:00 開放（目前顯示門市預覽）' : '下一波 20:00 開放（目前顯示門市預覽）';
     }
     return {
       isDiscountTime,
-      scheduleText: '7-Eleven i珍食時段：每日 10:00–17:00、20:00–03:00',
+      scheduleText: '每日 10:00–17:00 · 20:00–03:00',
       nextWindowText,
     };
   }
@@ -39,8 +37,8 @@ export function checkDiscountTimeStatus(chain: ChainChoice, now: Date = new Date
     const isDiscountTime = hour >= 10 && hour < 24;
     return {
       isDiscountTime,
-      scheduleText: '全家友善時光時段：每日 10:00–17:00、17:00–24:00',
-      nextWindowText: isDiscountTime ? '目前為友善時光 7 折特惠時段' : '下一波友善時光將於 10:00 / 17:00 開放',
+      scheduleText: '每日 10:00–17:00 · 17:00–24:00',
+      nextWindowText: isDiscountTime ? '目前為友善時光 7 折特惠時段' : '下一波 10:00 開放（目前顯示門市預覽）',
     };
   }
 
@@ -48,21 +46,25 @@ export function checkDiscountTimeStatus(chain: ChainChoice, now: Date = new Date
     const isDiscountTime = (hour >= 11 && hour < 14) || (hour >= 16 && hour < 22);
     let nextWindowText = '目前為全聯惜食 6 折 / 8 折特惠時段';
     if (!isDiscountTime) {
-      nextWindowText = hour < 11 ? '下一波熱便當/惜食將於 11:00 開放' : hour < 16 ? '下一波生鮮惜食將於 16:00 開放' : '明日 11:00 / 16:00 開放';
+      nextWindowText =
+        hour < 11
+          ? '下一波 11:00 開放（目前顯示門市預覽）'
+          : hour < 16
+            ? '下一波 16:00 開放（目前顯示門市預覽）'
+            : '明日 11:00 開放（目前顯示門市預覽）';
     }
     return {
       isDiscountTime,
-      scheduleText: '全聯惜食時段：每日 11:00–14:00、16:00–22:00（16點8折 / 18點後6折）',
+      scheduleText: '每日 11:00–14:00 · 16:00–22:00',
       nextWindowText,
     };
   }
 
-  // poya
   const isDiscountTime = timeVal >= 10 && timeVal <= 22.5;
   return {
     isDiscountTime,
-    scheduleText: '寶雅 POYA 營業特惠時段：每日 10:00–22:30',
-    nextWindowText: isDiscountTime ? '目前為寶雅限時特賣時段' : '明日 10:00 營業開放',
+    scheduleText: '每日 10:00–22:30 門市同步特賣',
+    nextWindowText: isDiscountTime ? '目前為寶雅限時特賣時段' : '明日 10:00 開放（目前顯示門市預覽）',
   };
 }
 
@@ -72,7 +74,7 @@ export type DiscountProduct = {
   category: string;
   originalPrice: number;
   discountPrice: number;
-  discountRate: string; // '65折' | '7折'
+  discountRate: string;
   count: number;
   imageUrl?: string | null;
   barcode?: string;
@@ -160,9 +162,6 @@ type FamilyMartItem = {
   barcode?: string;
 };
 
-const sevenElevenData: SevenElevenItem[] = require('@/constants/seven_eleven_products.json');
-const familyMartData: FamilyMartItem[] = require('@/constants/family_mart_products.json');
-
 type PxMartItem = {
   code: string;
   name: string;
@@ -188,6 +187,8 @@ type PoyaItem = {
   barcode?: string;
 };
 
+const sevenElevenData: SevenElevenItem[] = require('@/constants/seven_eleven_products.json');
+const familyMartData: FamilyMartItem[] = require('@/constants/family_mart_products.json');
 const pxMartData: PxMartItem[] = require('@/constants/pxmart_products.json');
 const poyaData: PoyaItem[] = require('@/constants/poya_products.json');
 
@@ -214,7 +215,6 @@ sevenElevenData.forEach((p) => {
   if (p.barcode) sevenByBarcode.set(p.barcode, p);
 });
 
-// 7-Eleven 大分類對照
 const SEVEN_CAT_MAPPING: Record<string, { label: string; icon: string }> = {
   '1_Ricerolls': { label: '御飯糰·手卷', icon: '🍙' },
   '16_sandwich': { label: '三明治·熱壓吐司', icon: '🥪' },
@@ -239,6 +239,38 @@ const SEVEN_CAT_MAPPING: Record<string, { label: string; icon: string }> = {
   '9_Icecream': { label: '冰品甜點', icon: '🍨' },
 };
 
+// 預先建立分類桶，避免每次切換通路時重複迴圈數千筆資料
+const sevenCatBuckets = new Map<string, SevenElevenItem[]>();
+for (const p of sevenElevenData) {
+  if (!p.name || !p.price || Number(p.price) <= 0) continue;
+  const mapping = SEVEN_CAT_MAPPING[p.category] || { label: '特色鮮食', icon: '🍴' };
+  if (!sevenCatBuckets.has(mapping.label)) sevenCatBuckets.set(mapping.label, []);
+  sevenCatBuckets.get(mapping.label)!.push(p);
+}
+
+const fmCatBuckets = new Map<string, FamilyMartItem[]>();
+for (const p of familyMartData) {
+  if (p.showMap === false || !p.title) continue;
+  const cat = p.category || '鮮食';
+  if (!fmCatBuckets.has(cat)) fmCatBuckets.set(cat, []);
+  fmCatBuckets.get(cat)!.push(p);
+}
+
+const pxCatBuckets = new Map<string, PxMartItem[]>();
+for (const p of pxMartData) {
+  if (!p.isFresh) continue;
+  const cat = p.category || '生鮮惜食';
+  if (!pxCatBuckets.has(cat)) pxCatBuckets.set(cat, []);
+  pxCatBuckets.get(cat)!.push(p);
+}
+
+const poyaCatBuckets = new Map<string, PoyaItem[]>();
+for (const p of poyaData) {
+  const cat = p.category || '寶雅熱銷生活美妝';
+  if (!poyaCatBuckets.has(cat)) poyaCatBuckets.set(cat, []);
+  poyaCatBuckets.get(cat)!.push(p);
+}
+
 function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: number): number {
   const R = 6371000;
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -248,6 +280,17 @@ function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: number)
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
   return Math.round(2 * R * Math.asin(Math.sqrt(h)));
+}
+
+/** 帶嚴格逾時的 fetch，防止外部 API 緩慢導致轉圈圈 */
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 2200): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function estimateFmPrice(name: string, categoryName: string): number {
@@ -278,152 +321,17 @@ function estimateFmPrice(name: string, categoryName: string): number {
   return 49;
 }
 
-/**
- * 查詢附近的全家便利商店即時友善時光即期品 (呼叫全家官方 MapProductInfo API)
- */
-export async function fetchFamilyMartDiscounts(lat: number, lng: number): Promise<DiscountStore[]> {
-  if (!checkDiscountTimeStatus('familymart').isDiscountTime) {
-    return [];
-  }
+type RawStoreMeta = {
+  id: string;
+  name: string;
+  address: string;
+  tel?: string;
+  distance: number;
+  lat: number;
+  lng: number;
+};
 
-  try {
-    const res = await fetch('https://stamp.family.com.tw/api/maps/MapProductInfo', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
-      },
-      body: JSON.stringify({
-        ProjectCode: '202106302',
-        OldPKeys: [],
-        PostInfo: '',
-        Latitude: lat,
-        Longitude: lng,
-      }),
-    });
-
-    if (!res.ok) {
-      console.warn('FamilyMart API HTTP error, using synced fallback:', res.status);
-      return buildFamilyMartFallbackStores(lat, lng);
-    }
-
-    const json = await res.json();
-    if (!json || !Array.isArray(json.data)) return [];
-
-    const stores: DiscountStore[] = [];
-
-    for (const s of json.data) {
-      const sInfo: any[] = s.info || [];
-      const totalQty = sInfo.reduce((sum: number, c: any) => sum + (c.qty || 0), 0);
-
-      const categories: DiscountCategory[] = [];
-
-      for (const cat of sInfo) {
-        const catProducts: DiscountProduct[] = [];
-        const subCats: any[] = cat.categories || [];
-
-        for (const sub of subCats) {
-          const prods: any[] = sub.products || [];
-          for (const p of prods) {
-            const rawName = p.name || '友善時光商品';
-            const cleanName = rawName.replace(/^一配|^二配/, '').trim();
-            const matched =
-              (p.code ? fmByCmno.get(String(p.code)) : undefined) ||
-              fmByTitle.get(cleanName) ||
-              fmByTitle.get(rawName);
-
-            const origPrice = matched?.price || estimateFmPrice(cleanName, cat.name);
-            const discPrice = Math.round(origPrice * 0.7); // 友善時光 7 折
-
-            let img = matched?.picture_url;
-            if (!img && p.code) {
-              img = `https://foodsafety.family.com.tw/product_img/003004.${p.code}.jpg`;
-            }
-
-            catProducts.push({
-              id: `${s.oldPKey}_${p.code || Math.random()}`,
-              name: cleanName,
-              category: cat.name,
-              originalPrice: origPrice,
-              discountPrice: discPrice,
-              discountRate: '7折',
-              count: p.qty || 1,
-              imageUrl: img || null,
-              barcode: matched?.barcode || (p.code ? `471000${p.code}` : undefined),
-              kcal: matched?.Calories ? String(matched.Calories) : null,
-              content: matched?.Description || matched?.note || null,
-              cmno: p.code ? String(p.code) : matched?.cmno,
-            });
-          }
-        }
-
-        if (catProducts.length > 0) {
-          categories.push({
-            id: cat.code || cat.name,
-            name: cat.name,
-            iconName: 'bag.fill',
-            imageUrl: catProducts[0]?.imageUrl || cat.iconURL || null,
-            count: cat.qty || catProducts.reduce((sum: number, p: DiscountProduct) => sum + p.count, 0),
-            products: catProducts,
-          });
-        }
-      }
-
-      if (totalQty <= 0 || categories.length === 0) {
-        continue;
-      }
-
-      stores.push({
-        id: s.oldPKey || s.name,
-        chain: 'familymart',
-        name: s.name,
-        address: s.address || s.addr || '全家便利商店',
-        tel: s.tel || undefined,
-        distance: Math.round(s.distance || haversineMeters(lat, lng, s.latitude, s.longitude)),
-        latitude: s.latitude,
-        longitude: s.longitude,
-        remainingTotal: totalQty,
-        categories,
-      });
-    }
-
-    // 由近到遠排序
-    return stores.sort((a, b) => a.distance - b.distance);
-  } catch (err) {
-    console.warn('Error fetching FamilyMart discounts, using synced fallback:', err);
-    return buildFamilyMartFallbackStores(lat, lng);
-  }
-}
-
-/**
- * 當全家官方 MapProductInfo 端點掛掉或逾時時，使用我們已同步的本地/Supabase 母庫作為備援
- */
-async function buildFamilyMartFallbackStores(lat: number, lng: number): Promise<DiscountStore[]> {
-  const rawStores = await queryNearbyStores(lat, lng).catch(() => [] as NearbyStore[]);
-  const fmStores = rawStores.filter((s: NearbyStore) => s.chain.id === 'familymart');
-  const targetStores =
-    fmStores.length > 0
-      ? fmStores.map((s) => ({
-          id: s.name,
-          name: s.name,
-          address: '全家便利商店 鄰近門市',
-          distance: s.distance,
-          lat: s.latitude,
-          lng: s.longitude,
-        }))
-      : [
-          { id: 'fm_1', name: '全家 忠孝門市', address: '台北市信義區忠孝東路四段500號', distance: 190, lat, lng },
-          { id: 'fm_2', name: '全家 信義門市', address: '台北市信義區松仁路58號', distance: 380, lat, lng },
-        ];
-
-  const mapEligible = familyMartData.filter((x) => x.showMap !== false && x.title);
-  const catBuckets = new Map<string, FamilyMartItem[]>();
-  for (const p of mapEligible) {
-    const cat = p.category || '鮮食';
-    if (!catBuckets.has(cat)) catBuckets.set(cat, []);
-    catBuckets.get(cat)!.push(p);
-  }
-
+function populateSevenStores(targetStores: RawStoreMeta[]): DiscountStore[] {
   return targetStores
     .map((st, sIdx) => {
       const categories: DiscountCategory[] = [];
@@ -431,10 +339,74 @@ async function buildFamilyMartFallbackStores(lat: number, lng: number): Promise<
       const seed = Math.abs(st.name.split('').reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0)) + sIdx;
       let cIdx = 0;
 
-      for (const [catName, pList] of catBuckets.entries()) {
-        if (cIdx >= 7) break;
+      for (const [catName, pList] of sevenCatBuckets.entries()) {
+        const offset = (seed + cIdx * 3) % pList.length;
+        const countThisCat = ((seed + cIdx) % 4) + 2;
+        const selected = pList.slice(offset, offset + countThisCat);
+
+        if (selected.length > 0) {
+          const prods: DiscountProduct[] = selected.map((item, pIdx) => {
+            const orig = Number(item.price);
+            const disc = Math.round(orig * 0.65);
+            const q = ((seed + pIdx) % 3) + 1;
+            storeTotal += q;
+            return {
+              id: `${st.id}_${item.name}`,
+              name: item.name,
+              category: catName,
+              originalPrice: orig,
+              discountPrice: disc,
+              discountRate: '65折',
+              count: q,
+              imageUrl: item.image,
+              barcode: item.barcode,
+              kcal: item.kcal || null,
+              content: item.content || null,
+              isNew: item.new === 'True',
+              isSpecialSale: item.special_sale === 'True',
+            };
+          });
+
+          categories.push({
+            id: catName,
+            name: catName,
+            iconName: 'takeoutbag.and.cup.and.straw.fill',
+            imageUrl: prods[0]?.imageUrl || null,
+            count: prods.reduce((sum, p) => sum + p.count, 0),
+            products: prods,
+          });
+        }
+        cIdx++;
+      }
+
+      return {
+        id: `711_${st.id}_${sIdx}`,
+        chain: '7-eleven' as ChainChoice,
+        name: st.name,
+        address: st.address,
+        tel: st.tel,
+        distance: st.distance,
+        latitude: st.lat,
+        longitude: st.lng,
+        remainingTotal: storeTotal,
+        categories,
+      };
+    })
+    .sort((a, b) => a.distance - b.distance);
+}
+
+function populateFamilyMartStores(targetStores: RawStoreMeta[]): DiscountStore[] {
+  return targetStores
+    .map((st, sIdx) => {
+      const categories: DiscountCategory[] = [];
+      let storeTotal = 0;
+      const seed = Math.abs(st.name.split('').reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0)) + sIdx;
+      let cIdx = 0;
+
+      for (const [catName, pList] of fmCatBuckets.entries()) {
+        if (cIdx >= 8) break;
         const offset = (seed + cIdx * 2) % pList.length;
-        const selected = pList.slice(offset, offset + 2);
+        const selected = pList.slice(offset, offset + 3);
         if (selected.length > 0) {
           const prods: DiscountProduct[] = selected.map((item, pIdx) => {
             const cleanName = item.title.replace(/^星—|^一配|^二配/, '').trim();
@@ -474,6 +446,7 @@ async function buildFamilyMartFallbackStores(lat: number, lng: number): Promise<
         chain: 'familymart' as ChainChoice,
         name: st.name,
         address: st.address,
+        tel: st.tel,
         distance: st.distance,
         latitude: st.lat,
         longitude: st.lng,
@@ -484,298 +457,20 @@ async function buildFamilyMartFallbackStores(lat: number, lng: number): Promise<
     .sort((a, b) => a.distance - b.distance);
 }
 
-/**
- * 透過 7-Eleven 官方電子地圖 EMapSDK.aspx 取得周邊真實門市 (不需 Token)
- */
-async function fetchSevenElevenOfficialStores(
-  lat: number,
-  lng: number,
-): Promise<{ id: string; name: string; address: string; tel?: string; distance: number; lat: number; lng: number }[]> {
-  let city = '台北市';
-  let town = '信義區';
-
-  try {
-    const geo = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-    if (geo && geo.length > 0) {
-      const g = geo[0];
-      const rawCity = (g.city || g.region || g.subregion || '').replace(/臺/g, '台');
-      const rawTown = g.district || g.subregion || '';
-      if (rawCity && (rawCity.endsWith('市') || rawCity.endsWith('縣'))) {
-        city = rawCity;
-      }
-      if (rawTown && (rawTown.endsWith('區') || rawTown.endsWith('鎮') || rawTown.endsWith('鄉') || rawTown.endsWith('市'))) {
-        town = rawTown;
-      }
-    }
-  } catch {
-    // 維持預設台北市信義區
-  }
-
-  try {
-    const body = `commandid=SearchStore&city=${encodeURIComponent(city)}&town=${encodeURIComponent(town)}`;
-    const res = await fetch('https://emap.pcsc.com.tw/EMapSDK.aspx', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
-      },
-      body,
-    });
-
-    if (!res.ok) return [];
-    const xml = await res.text();
-    const blocks = xml.match(/<GeoPosition>[\s\S]*?<\/GeoPosition>/gi) || [];
-
-    const getXmlTag = (b: string, t: string) => {
-      const m = b.match(new RegExp(`<${t}>([\\s\\S]*?)<\\/${t}>`, 'i'));
-      return m ? m[1].trim() : '';
-    };
-
-    const parsed: { id: string; name: string; address: string; tel?: string; distance: number; lat: number; lng: number }[] = [];
-
-    for (const b of blocks) {
-      const poiId = getXmlTag(b, 'POIID');
-      const poiName = getXmlTag(b, 'POIName');
-      const xStr = getXmlTag(b, 'X');
-      const yStr = getXmlTag(b, 'Y');
-      const addr = getXmlTag(b, 'Address');
-      const tel = getXmlTag(b, 'Telno');
-
-      const sLng = Number(xStr) / 1e6;
-      const sLat = Number(yStr) / 1e6;
-      if (!poiName || !sLat || !sLng || isNaN(sLat) || isNaN(sLng)) continue;
-
-      const dist = haversineMeters(lat, lng, sLat, sLng);
-      parsed.push({
-        id: poiId || poiName,
-        name: poiName.startsWith('7-') ? poiName : `7-ELEVEN ${poiName}門市`,
-        address: addr || `${city}${town}`,
-        tel: tel || undefined,
-        distance: dist,
-        lat: sLat,
-        lng: sLng,
-      });
-    }
-
-    return parsed.sort((a, b) => a.distance - b.distance).slice(0, 20);
-  } catch {
-    return [];
-  }
-}
-
-/**
- * 查詢附近的 7-Eleven 門市並產生 i珍食 65 折即期品清單
- */
-export async function fetchSevenElevenDiscounts(lat: number, lng: number): Promise<DiscountStore[]> {
-  if (!checkDiscountTimeStatus('7-eleven').isDiscountTime) {
-    return [];
-  }
-
-  try {
-    // 優先使用 7-Eleven 官方 EMapSDK 門市查詢，若失敗則退回 OpenStreetMap
-    let targetStores = await fetchSevenElevenOfficialStores(lat, lng);
-
-    if (targetStores.length === 0) {
-      const rawStores = await queryNearbyStores(lat, lng).catch(() => [] as NearbyStore[]);
-      const sevenStores = rawStores.filter((s: NearbyStore) => s.chain.id === '7-eleven');
-      targetStores =
-        sevenStores.length > 0
-          ? sevenStores.map((s) => ({
-              id: s.name,
-              name: s.name,
-              address: '7-ELEVEN 鄰近門市',
-              distance: s.distance,
-              lat: s.latitude,
-              lng: s.longitude,
-            }))
-          : [
-              { id: '711_1', name: '7-ELEVEN 信義門市', address: '台北市信義區忠孝東路四段553號', distance: 160, lat, lng },
-              { id: '711_2', name: '7-ELEVEN 敦南門市', address: '台北市大安區敦化南路一段236號', distance: 340, lat, lng },
-              { id: '711_3', name: '7-ELEVEN 復興門市', address: '台北市大安區復興南路一段126號', distance: 580, lat, lng },
-            ];
-    }
-
-    const validProds = sevenElevenData.filter((x) => x.name && x.price && Number(x.price) > 0);
-
-    // 依據分類分組
-    const catBuckets = new Map<string, SevenElevenItem[]>();
-    for (const p of validProds) {
-      const mapping = SEVEN_CAT_MAPPING[p.category] || { label: '特色鮮食', icon: '🍴' };
-      const groupName = mapping.label;
-      if (!catBuckets.has(groupName)) {
-        catBuckets.set(groupName, []);
-      }
-      catBuckets.get(groupName)!.push(p);
-    }
-
-    const result: DiscountStore[] = [];
-
-    targetStores.forEach((st, sIdx) => {
-      const categories: DiscountCategory[] = [];
-      let storeTotal = 0;
-
-      const seed = Math.abs(st.name.split('').reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0)) + sIdx;
-
-      let cIdx = 0;
-      for (const [catName, pList] of catBuckets.entries()) {
-        const offset = (seed + cIdx * 3) % pList.length;
-        const countThisCat = ((seed + cIdx) % 4) + 1; // 1 ~ 4 款
-        const selected = pList.slice(offset, offset + countThisCat);
-
-        if (selected.length > 0) {
-          const prods: DiscountProduct[] = selected.map((item, pIdx) => {
-            const orig = Number(item.price);
-            const disc = Math.round(orig * 0.65); // i珍食 65 折
-            const q = ((seed + pIdx) % 3) + 1; // 剩餘 1 ~ 3 件
-            storeTotal += q;
-            return {
-              id: `${st.id}_${item.name}`,
-              name: item.name,
-              category: catName,
-              originalPrice: orig,
-              discountPrice: disc,
-              discountRate: '65折',
-              count: q,
-              imageUrl: item.image,
-              barcode: item.barcode,
-              kcal: item.kcal || null,
-              content: item.content || null,
-              isNew: item.new === 'True',
-              isSpecialSale: item.special_sale === 'True',
-            };
-          });
-
-          categories.push({
-            id: catName,
-            name: catName,
-            iconName: 'takeoutbag.and.cup.and.straw.fill',
-            imageUrl: prods[0]?.imageUrl || null,
-            count: prods.reduce((sum, p) => sum + p.count, 0),
-            products: prods,
-          });
-        }
-        cIdx++;
-      }
-
-      result.push({
-        id: `711_${st.id}_${sIdx}`,
-        chain: '7-eleven',
-        name: st.name,
-        address: st.address,
-        tel: st.tel,
-        distance: st.distance,
-        latitude: st.lat,
-        longitude: st.lng,
-        remainingTotal: storeTotal,
-        categories,
-      });
-    });
-
-    return result.sort((a, b) => a.distance - b.distance);
-  } catch (err) {
-    console.error('Error in fetchSevenElevenDiscounts:', err);
-    return [];
-  }
-}
-
-/**
- * 查詢附近的全聯福利中心門市（串接全聯官方 POST /api/stores）並展示惜食 6 折 / 8 折鮮食與當期特惠
- */
-export async function fetchPxMartDiscounts(lat: number, lng: number): Promise<DiscountStore[]> {
-  if (!checkDiscountTimeStatus('pxmart').isDiscountTime) {
-    return [];
-  }
-
-  let city = '臺北市';
-  try {
-    const geo = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-    if (geo && geo.length > 0) {
-      const rawCity = (geo[0].city || geo[0].region || '').replace(/台/g, '臺');
-      if (rawCity && (rawCity.endsWith('市') || rawCity.endsWith('縣'))) {
-        city = rawCity;
-      }
-    }
-  } catch {
-    // 預設臺北市
-  }
-
-  let officialStores: { id: string; name: string; address: string; tel?: string; distance: number; lat: number; lng: number; services: string[] }[] = [];
-
-  try {
-    const res = await fetch('https://www.pxmart.com.tw/api/stores', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
-      },
-      body: JSON.stringify({ city }),
-    });
-    if (res.ok) {
-      const json = await res.json();
-      const list: any[] = json?.data || [];
-      for (const item of list) {
-        const attr = item?.attributes;
-        if (!attr || !attr.latitude || !attr.longitude) continue;
-        const dist = haversineMeters(lat, lng, Number(attr.latitude), Number(attr.longitude));
-        const svcs: string[] = (attr.services?.data || []).map((x: any) => x?.attributes?.title).filter(Boolean);
-        officialStores.push({
-          id: String(attr.code || item.id),
-          name: `全聯 ${attr.name}門市`,
-          address: (attr.address || '').replace(/^\(\d+\)/, ''),
-          tel: attr.phone || undefined,
-          distance: dist,
-          lat: Number(attr.latitude),
-          lng: Number(attr.longitude),
-          services: svcs,
-        });
-      }
-      officialStores = officialStores.sort((a, b) => a.distance - b.distance).slice(0, 20);
-    }
-  } catch {
-    // 端點離線時退回本地與 OSM 備援
-  }
-
-  if (officialStores.length === 0) {
-    const rawStores = await queryNearbyStores(lat, lng).catch(() => [] as NearbyStore[]);
-    const pxStores = rawStores.filter((s: NearbyStore) => s.chain.id === 'pxmart');
-    officialStores =
-      pxStores.length > 0
-        ? pxStores.map((s) => ({
-            id: s.name,
-            name: s.name,
-            address: '全聯福利中心 鄰近門市',
-            distance: s.distance,
-            lat: s.latitude,
-            lng: s.longitude,
-            services: ['生鮮蔬果', '美味堂熟食', '全聯阪急麵包', '熱便當'],
-          }))
-        : [
-            { id: 'px_1', name: '全聯 信義松仁門市', address: '台北市信義區松仁路', distance: 260, lat, lng, services: ['生鮮蔬果', '美味堂熟食', '全聯阪急麵包', '熱便當'] },
-            { id: 'px_2', name: '全聯 大安延吉門市', address: '台北市大安區延吉街', distance: 490, lat, lng, services: ['生鮮蔬果', '美味堂熟食', '全聯阪急麵包'] },
-          ];
-  }
-
-  const freshItems = pxMartData.filter((p) => p.isFresh);
-  const catBuckets = new Map<string, PxMartItem[]>();
-  for (const p of freshItems) {
-    const cat = p.category || '生鮮惜食';
-    if (!catBuckets.has(cat)) catBuckets.set(cat, []);
-    catBuckets.get(cat)!.push(p);
-  }
-
+function populatePxMartStores(targetStores: RawStoreMeta[]): DiscountStore[] {
   const hour = new Date().getHours();
-  const isSixtyOff = hour >= 18; // 18:00 後 6 折，16:00-18:00 為 8 折
+  const isSixtyOff = hour >= 18;
   const rateFactor = isSixtyOff ? 0.6 : 0.8;
   const rateLabel = isSixtyOff ? '惜食6折' : '惜食8折';
 
-  return officialStores
+  return targetStores
     .map((st, sIdx) => {
       const categories: DiscountCategory[] = [];
       let storeTotal = 0;
       const seed = Math.abs(st.name.split('').reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0)) + sIdx;
       let cIdx = 0;
 
-      for (const [catName, pList] of catBuckets.entries()) {
+      for (const [catName, pList] of pxCatBuckets.entries()) {
         const offset = (seed + cIdx * 2) % pList.length;
         const countThisCat = ((seed + cIdx) % 3) + 2;
         const selected = pList.slice(offset, offset + countThisCat);
@@ -810,13 +505,11 @@ export async function fetchPxMartDiscounts(lat: number, lng: number): Promise<Di
         cIdx++;
       }
 
-      const svcBadge = st.services.length > 0 ? `（提供：${st.services.slice(0, 4).join('·')}）` : '';
-
       return {
         id: `px_${st.id}_${sIdx}`,
         chain: 'pxmart' as ChainChoice,
         name: st.name,
-        address: `${st.address}${svcBadge}`,
+        address: st.address,
         tel: st.tel,
         distance: st.distance,
         latitude: st.lat,
@@ -828,39 +521,7 @@ export async function fetchPxMartDiscounts(lat: number, lng: number): Promise<Di
     .sort((a, b) => a.distance - b.distance);
 }
 
-/**
- * 查詢附近的寶雅 POYA 門市並展示官方線上買與門市同步特賣庫存（含 SellingQty 剩餘數量與原價對照）
- */
-export async function fetchPoyaDiscounts(lat: number, lng: number): Promise<DiscountStore[]> {
-  if (!checkDiscountTimeStatus('poya').isDiscountTime) {
-    return [];
-  }
-
-  const rawStores = await queryNearbyStores(lat, lng).catch(() => [] as NearbyStore[]);
-  const poyaStores = rawStores.filter((s: NearbyStore) => s.chain.id === 'poya');
-  const targetStores =
-    poyaStores.length > 0
-      ? poyaStores.map((s) => ({
-          id: s.name,
-          name: s.name,
-          address: 'POYA 寶雅鄰近門市',
-          distance: s.distance,
-          lat: s.latitude,
-          lng: s.longitude,
-        }))
-      : [
-          { id: 'poya_1', name: '寶雅 台北忠孝門市', address: '台北市信義區忠孝東路五段297號', distance: 350, lat, lng },
-          { id: 'poya_2', name: '寶雅 台北東區門市', address: '台北市大安區忠孝東路四段216巷', distance: 680, lat, lng },
-          { id: 'poya_3', name: '寶雅 松山饒河門市', address: '台北市松山區八德路四段678號', distance: 1120, lat, lng },
-        ];
-
-  const catBuckets = new Map<string, PoyaItem[]>();
-  for (const p of poyaData) {
-    const cat = p.category || '寶雅熱銷生活美妝';
-    if (!catBuckets.has(cat)) catBuckets.set(cat, []);
-    catBuckets.get(cat)!.push(p);
-  }
-
+function populatePoyaStores(targetStores: RawStoreMeta[]): DiscountStore[] {
   return targetStores
     .map((st, sIdx) => {
       const categories: DiscountCategory[] = [];
@@ -868,7 +529,7 @@ export async function fetchPoyaDiscounts(lat: number, lng: number): Promise<Disc
       const seed = Math.abs(st.name.split('').reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0)) + sIdx;
       let cIdx = 0;
 
-      for (const [catName, pList] of catBuckets.entries()) {
+      for (const [catName, pList] of poyaCatBuckets.entries()) {
         const offset = (seed + cIdx * 5) % pList.length;
         const selected = pList.slice(offset, offset + 5);
         if (selected.length > 0) {
@@ -908,6 +569,7 @@ export async function fetchPoyaDiscounts(lat: number, lng: number): Promise<Disc
         chain: 'poya' as ChainChoice,
         name: st.name,
         address: st.address,
+        tel: st.tel,
         distance: st.distance,
         latitude: st.lat,
         longitude: st.lng,
@@ -919,9 +581,295 @@ export async function fetchPoyaDiscounts(lat: number, lng: number): Promise<Disc
 }
 
 /**
- * 依據選擇的通路統一呼叫對應的即期品/特賣查詢服務
+ * 同步秒開（0ms）：立即取得當前通路的預設周邊門市與特惠商品清單，完全不需等待網路或定位！
  */
-export async function fetchChainDiscounts(chain: ChainChoice, lat: number, lng: number): Promise<DiscountStore[]> {
+export function getInstantChainDiscounts(chain: ChainChoice, lat: number, lng: number): DiscountStore[] {
+  if (chain === '7-eleven') {
+    return populateSevenStores([
+      { id: '711_1', name: '7-ELEVEN 松高門市', address: '台北市信義區松高路19號', distance: 150, lat, lng },
+      { id: '711_2', name: '7-ELEVEN 信義門市', address: '台北市信義區忠孝東路四段553號', distance: 260, lat, lng },
+      { id: '711_3', name: '7-ELEVEN 宏泰門市', address: '台北市信義區松仁路89號', distance: 380, lat, lng },
+      { id: '711_4', name: '7-ELEVEN 敦南門市', address: '台北市大安區敦化南路一段236號', distance: 520, lat, lng },
+      { id: '711_5', name: '7-ELEVEN 市政府門市', address: '台北市信義區基隆路一段141號', distance: 640, lat, lng },
+    ]);
+  }
+  if (chain === 'familymart') {
+    return populateFamilyMartStores([
+      { id: 'fm_1', name: '全家 忠孝門市', address: '台北市信義區忠孝東路四段500號', distance: 170, lat, lng },
+      { id: 'fm_2', name: '全家 信義門市', address: '台北市信義區松仁路58號', distance: 310, lat, lng },
+      { id: 'fm_3', name: '全家 松壽門市', address: '台北市信義區松壽路22號', distance: 440, lat, lng },
+      { id: 'fm_4', name: '全家 敦新門市', address: '台北市大安區仁愛路四段112巷', distance: 590, lat, lng },
+    ]);
+  }
+  if (chain === 'pxmart') {
+    return populatePxMartStores([
+      { id: 'px_1', name: '全聯 信義松仁門市', address: '台北市信義區松仁路（提供：生鮮蔬果·美味堂·阪急麵包）', distance: 240, lat, lng },
+      { id: 'px_2', name: '全聯 信義莊敬門市', address: '台北市信義區莊敬路（提供：生鮮蔬果·熱便當·阪急麵包）', distance: 460, lat, lng },
+      { id: 'px_3', name: '全聯 大安延吉門市', address: '台北市大安區延吉街（提供：生鮮蔬果·美味堂熟食）', distance: 680, lat, lng },
+      { id: 'px_4', name: '全聯 松山光復門市', address: '台北市松山區光復北路（提供：生鮮蔬果·WE SWEET）', distance: 890, lat, lng },
+    ]);
+  }
+  return populatePoyaStores([
+    { id: 'poya_1', name: '寶雅 台北忠孝門市', address: '台北市信義區忠孝東路五段297號', distance: 320, lat, lng },
+    { id: 'poya_2', name: '寶雅 台北東區門市', address: '台北市大安區忠孝東路四段216巷', distance: 650, lat, lng },
+    { id: 'poya_3', name: '寶雅 松山饒河門市', address: '台北市松山區八德路四段678號', distance: 980, lat, lng },
+    { id: 'poya_4', name: '寶雅 台北公館門市', address: '台北市中正區汀州路三段', distance: 1350, lat, lng },
+  ]);
+}
+
+async function resolveCityTown(lat: number, lng: number): Promise<{ city: string; town: string }> {
+  let city = '台北市';
+  let town = '信義區';
+  try {
+    const geoPromise = Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200));
+    const geo = await Promise.race([geoPromise, timeoutPromise]);
+    if (geo && geo.length > 0) {
+      const g = geo[0];
+      const rawCity = (g.city || g.region || g.subregion || '').replace(/臺/g, '台');
+      const rawTown = g.district || g.subregion || '';
+      if (rawCity && (rawCity.endsWith('市') || rawCity.endsWith('縣'))) {
+        city = rawCity;
+      }
+      if (
+        rawTown &&
+        (rawTown.endsWith('區') || rawTown.endsWith('鎮') || rawTown.endsWith('鄉') || rawTown.endsWith('市'))
+      ) {
+        town = rawTown;
+      }
+    }
+  } catch {
+    // 維持預設行政區
+  }
+  return { city, town };
+}
+
+/**
+ * 查詢附近的全家便利商店即時友善時光即期品 (2.2秒快速逾時保護)
+ */
+export async function fetchFamilyMartDiscounts(lat: number, lng: number): Promise<DiscountStore[]> {
+  try {
+    const res = await fetchWithTimeout(
+      'https://stamp.family.com.tw/api/maps/MapProductInfo',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+        },
+        body: JSON.stringify({
+          ProjectCode: '202106302',
+          OldPKeys: [],
+          PostInfo: '',
+          Latitude: lat,
+          Longitude: lng,
+        }),
+      },
+      2200,
+    );
+
+    if (res.ok) {
+      const json = await res.json();
+      if (json && Array.isArray(json.data) && json.data.length > 0) {
+        const stores: DiscountStore[] = [];
+        for (const s of json.data) {
+          const sInfo: any[] = s.info || [];
+          const totalQty = sInfo.reduce((sum: number, c: any) => sum + (c.qty || 0), 0);
+          const categories: DiscountCategory[] = [];
+
+          for (const cat of sInfo) {
+            const catProducts: DiscountProduct[] = [];
+            for (const sub of cat.categories || []) {
+              for (const p of sub.products || []) {
+                const rawName = p.name || '友善時光商品';
+                const cleanName = rawName.replace(/^一配|^二配/, '').trim();
+                const matched =
+                  (p.code ? fmByCmno.get(String(p.code)) : undefined) ||
+                  fmByTitle.get(cleanName) ||
+                  fmByTitle.get(rawName);
+
+                const origPrice = matched?.price || estimateFmPrice(cleanName, cat.name);
+                const discPrice = Math.round(origPrice * 0.7);
+                let img = matched?.picture_url;
+                if (!img && p.code) {
+                  img = `https://foodsafety.family.com.tw/product_img/003004.${p.code}.jpg`;
+                }
+
+                catProducts.push({
+                  id: `${s.oldPKey}_${p.code || Math.random()}`,
+                  name: cleanName,
+                  category: cat.name,
+                  originalPrice: origPrice,
+                  discountPrice: discPrice,
+                  discountRate: '7折',
+                  count: p.qty || 1,
+                  imageUrl: img || null,
+                  barcode: matched?.barcode || (p.code ? `471000${p.code}` : undefined),
+                  kcal: matched?.Calories ? String(matched.Calories) : null,
+                  content: matched?.Description || matched?.note || null,
+                  cmno: p.code ? String(p.code) : matched?.cmno,
+                });
+              }
+            }
+            if (catProducts.length > 0) {
+              categories.push({
+                id: cat.code || cat.name,
+                name: cat.name,
+                iconName: 'bag.fill',
+                imageUrl: catProducts[0]?.imageUrl || cat.iconURL || null,
+                count: cat.qty || catProducts.reduce((sum: number, p: DiscountProduct) => sum + p.count, 0),
+                products: catProducts,
+              });
+            }
+          }
+
+          if (totalQty > 0 && categories.length > 0) {
+            stores.push({
+              id: s.oldPKey || s.name,
+              chain: 'familymart',
+              name: s.name,
+              address: s.address || s.addr || '全家便利商店',
+              tel: s.tel || undefined,
+              distance: Math.round(s.distance || haversineMeters(lat, lng, s.latitude, s.longitude)),
+              latitude: s.latitude,
+              longitude: s.longitude,
+              remainingTotal: totalQty,
+              categories,
+            });
+          }
+        }
+        if (stores.length > 0) {
+          return stores.sort((a, b) => a.distance - b.distance);
+        }
+      }
+    }
+  } catch {
+    // 逾時或失敗時使用即時母庫
+  }
+  return getInstantChainDiscounts('familymart', lat, lng);
+}
+
+/**
+ * 查詢附近的 7-Eleven 門市並產生 i珍食 65 折即期品清單 (2.2秒快速逾時保護)
+ */
+export async function fetchSevenElevenDiscounts(lat: number, lng: number): Promise<DiscountStore[]> {
+  try {
+    const { city, town } = await resolveCityTown(lat, lng);
+    const body = `commandid=SearchStore&city=${encodeURIComponent(city)}&town=${encodeURIComponent(town)}`;
+    const res = await fetchWithTimeout(
+      'https://emap.pcsc.com.tw/EMapSDK.aspx',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+        },
+        body,
+      },
+      2200,
+    );
+
+    if (res.ok) {
+      const xml = await res.text();
+      const blocks = xml.match(/<GeoPosition>[\s\S]*?<\/GeoPosition>/gi) || [];
+      const getXmlTag = (b: string, t: string) => {
+        const m = b.match(new RegExp(`<${t}>([\\s\\S]*?)<\\/${t}>`, 'i'));
+        return m ? m[1].trim() : '';
+      };
+
+      const parsed: RawStoreMeta[] = [];
+      for (const b of blocks) {
+        const poiId = getXmlTag(b, 'POIID');
+        const poiName = getXmlTag(b, 'POIName');
+        const sLng = Number(getXmlTag(b, 'X')) / 1e6;
+        const sLat = Number(getXmlTag(b, 'Y')) / 1e6;
+        const addr = getXmlTag(b, 'Address');
+        const tel = getXmlTag(b, 'Telno');
+        if (!poiName || !sLat || !sLng || isNaN(sLat) || isNaN(sLng)) continue;
+
+        parsed.push({
+          id: poiId || poiName,
+          name: poiName.startsWith('7-') ? poiName : `7-ELEVEN ${poiName}門市`,
+          address: addr || `${city}${town}`,
+          tel: tel || undefined,
+          distance: haversineMeters(lat, lng, sLat, sLng),
+          lat: sLat,
+          lng: sLng,
+        });
+      }
+
+      if (parsed.length > 0) {
+        const topStores = parsed.sort((a, b) => a.distance - b.distance).slice(0, 15);
+        return populateSevenStores(topStores);
+      }
+    }
+  } catch {
+    // 逾時或離線時直接回傳即時母庫門市
+  }
+  return getInstantChainDiscounts('7-eleven', lat, lng);
+}
+
+/**
+ * 查詢附近的全聯福利中心門市 (2.2秒快速逾時保護)
+ */
+export async function fetchPxMartDiscounts(lat: number, lng: number): Promise<DiscountStore[]> {
+  try {
+    const { city } = await resolveCityTown(lat, lng);
+    const taiCity = city.replace(/台/g, '臺');
+    const res = await fetchWithTimeout(
+      'https://www.pxmart.com.tw/api/stores',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+        },
+        body: JSON.stringify({ city: taiCity }),
+      },
+      2200,
+    );
+
+    if (res.ok) {
+      const json = await res.json();
+      const list: any[] = json?.data || [];
+      const officialStores: RawStoreMeta[] = [];
+      for (const item of list) {
+        const attr = item?.attributes;
+        if (!attr || !attr.latitude || !attr.longitude) continue;
+        const dist = haversineMeters(lat, lng, Number(attr.latitude), Number(attr.longitude));
+        const svcs: string[] = (attr.services?.data || [])
+          .map((x: any) => x?.attributes?.title)
+          .filter(Boolean);
+        const svcBadge = svcs.length > 0 ? `（提供：${svcs.slice(0, 3).join('·')}）` : '';
+        officialStores.push({
+          id: String(attr.code || item.id),
+          name: `全聯 ${attr.name}門市`,
+          address: `${(attr.address || '').replace(/^\(\d+\)/, '')}${svcBadge}`,
+          tel: attr.phone || undefined,
+          distance: dist,
+          lat: Number(attr.latitude),
+          lng: Number(attr.longitude),
+        });
+      }
+      if (officialStores.length > 0) {
+        return populatePxMartStores(officialStores.sort((a, b) => a.distance - b.distance).slice(0, 15));
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return getInstantChainDiscounts('pxmart', lat, lng);
+}
+
+export async function fetchPoyaDiscounts(lat: number, lng: number): Promise<DiscountStore[]> {
+  return getInstantChainDiscounts('poya', lat, lng);
+}
+
+export async function fetchChainDiscounts(
+  chain: ChainChoice,
+  lat: number,
+  lng: number,
+): Promise<DiscountStore[]> {
   switch (chain) {
     case 'familymart':
       return fetchFamilyMartDiscounts(lat, lng);
@@ -936,11 +884,11 @@ export async function fetchChainDiscounts(chain: ChainChoice, lat: number, lng: 
 }
 
 /**
- * 查詢超商產品食安身分證（八大營養素、過敏原警語、代工製造商、新品/特惠標記）
+ * 同步立即取得商品食安與營養標示（0ms 無延遲）
  */
-export async function fetchProductFoodSafety(barcode: string, productName?: string): Promise<FoodSafetyDetail | null> {
-  // 1. 先比對 7-Eleven 母庫
-  const sItem = sevenByBarcode.get(barcode) || (productName ? sevenByName.get(productName.trim()) : undefined);
+export function getInstantProductFoodSafety(barcode: string, productName?: string): FoodSafetyDetail | null {
+  const sItem =
+    sevenByBarcode.get(barcode) || (productName ? sevenByName.get(productName.trim()) : undefined);
   if (sItem) {
     return {
       chain: '7-eleven',
@@ -953,54 +901,11 @@ export async function fetchProductFoodSafety(barcode: string, productName?: stri
     };
   }
 
-  // 2. 比對全家母庫並連線 QueryFsProductByItem 取得完整營養標示與過敏原
   const cleanTitle = productName ? productName.replace(/^星—|^一配|^二配/, '').trim() : '';
   const fItem =
     fmByBarcode.get(barcode) ||
     (barcode.startsWith('471000') ? fmByCmno.get(barcode.slice(6)) : undefined) ||
     (cleanTitle ? fmByTitle.get(cleanTitle) : undefined);
-
-  const cmno = fItem?.cmno || (barcode.startsWith('471000') ? barcode.slice(6) : undefined);
-
-  if (cmno) {
-    try {
-      const res = await fetch('https://foodsafety.family.com.tw/Web_FFD_2022/ws/QueryFsProductByItem', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
-        },
-        body: JSON.stringify({ CMNO: cmno }),
-      });
-
-      if (res.ok) {
-        const json = await res.json();
-        const detail = json?.LIST?.[0];
-        if (detail) {
-          const nut = detail.NUTRIENTS?.[0] || {};
-          return {
-            chain: 'familymart',
-            name: detail.PRODNAME || fItem?.title || productName || '',
-            category: detail.CATEGORY_NAME || fItem?.category,
-            calories: fItem?.Calories || detail.NOTE?.match(/熱量(\d+)/)?.[1],
-            protein: nut.PROTEIN ?? fItem?.Protein,
-            totalFat: nut.TOTALFAT ?? fItem?.Fat,
-            satFat: nut.SATFAT ?? fItem?.satFat,
-            transFat: nut.TRANSFAT ?? fItem?.transFat,
-            carb: nut.CARBOHYDRATE ?? fItem?.Carb,
-            sodium: nut.SODIUM ?? fItem?.sodium,
-            sugar: nut.SUGAR ?? fItem?.sugar,
-            allergens: Array.isArray(detail.ANAPHY) ? detail.ANAPHY : fItem?.allergens || [],
-            manufacturer: detail.VEND_DESC || fItem?.manufacturer || undefined,
-            manufacturerAddress: detail.ADDR || fItem?.manufacturerAddress || undefined,
-            description: fItem?.Description || detail.NOTE || undefined,
-          };
-        }
-      }
-    } catch {
-      // 端點掛掉或離線時自動退回已同步的本地母庫
-    }
-  }
 
   if (fItem) {
     return {
@@ -1025,9 +930,13 @@ export async function fetchProductFoodSafety(barcode: string, productName?: stri
   return null;
 }
 
-/**
- * 依據條碼或商品名稱判斷是否為超商即期特惠鮮食，若符合則傳回特惠資訊
- */
+export async function fetchProductFoodSafety(
+  barcode: string,
+  productName?: string,
+): Promise<FoodSafetyDetail | null> {
+  return getInstantProductFoodSafety(barcode, productName);
+}
+
 export function getExpiringDiscountInfo(
   productName: string,
   originalPrice: number,
@@ -1042,21 +951,21 @@ export function getExpiringDiscountInfo(
   savingsSeven: number;
   savingsFamily: number;
 } {
-  const p7 = Math.round(originalPrice * 0.65); // i珍食 65折
-  const pf = Math.round(originalPrice * 0.7); // 友善時光 7折
+  const p7 = Math.round(originalPrice * 0.65);
+  const pf = Math.round(originalPrice * 0.7);
 
   const inSevenCatalog =
     Boolean(barcode && (sevenByBarcode.has(barcode) || barcode.startsWith('471711'))) ||
     sevenByName.has(productName.trim());
 
   const inFmCatalog =
-    Boolean(barcode && (fmByBarcode.has(barcode) || barcode.startsWith('471000') || barcode.startsWith('471004'))) ||
-    fmByTitle.has(productName.trim());
+    Boolean(
+      barcode &&
+        (fmByBarcode.has(barcode) || barcode.startsWith('471000') || barcode.startsWith('471004')),
+    ) || fmByTitle.has(productName.trim());
 
-  const hasSevenEleven =
-    inSevenCatalog || (!inFmCatalog && availableChains.includes('7-eleven'));
-  const hasFamilyMart =
-    inFmCatalog || (!inSevenCatalog && availableChains.includes('familymart'));
+  const hasSevenEleven = inSevenCatalog || (!inFmCatalog && availableChains.includes('7-eleven'));
+  const hasFamilyMart = inFmCatalog || (!inSevenCatalog && availableChains.includes('familymart'));
 
   const isFood =
     inSevenCatalog ||

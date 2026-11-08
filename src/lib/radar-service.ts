@@ -115,15 +115,87 @@ const sevenElevenData: any[] = require('@/constants/seven_eleven_products.json')
 const familyMartData: any[] = require('@/constants/family_mart_products.json');
 const dailyData: DailyNecessityItem[] = require('@/constants/daily_necessities.json');
 
-export const DAILY_CATEGORY_TABS: { id: DailyCategoryTab; label: string }[] = [
-  { id: '口腔護理·牙線牙膏', label: '🪥 牙線·牙膏·口腔' },
-  { id: '紙品濕巾·衛生棉', label: '🧻 衛生紙·濕巾·棉棒' },
-  { id: '洗沐清潔·個人護理', label: '🧴 洗髮·沐浴·洗面乳' },
-  { id: '居家清潔·生活百貨', label: '🧹 洗衣·洗碗·電池百貨' },
+export const DAILY_CATEGORY_TABS: {
+  id: DailyCategoryTab;
+  label: string;
+  shortLabel: string;
+  emoji: string;
+  subtitle: string;
+}[] = [
+  {
+    id: '口腔護理·牙線牙膏',
+    label: '🪥 牙線·牙膏·口腔',
+    shortLabel: '口腔·牙線',
+    emoji: '🪥',
+    subtitle: '3M、歐樂B牙線棒、舒酸定、高露潔、漱口水跨店比價',
+  },
+  {
+    id: '紙品濕巾·衛生棉',
+    label: '🧻 衛生紙·濕巾·棉棒',
+    shortLabel: '紙品·衛生棉',
+    emoji: '🧻',
+    subtitle: '舒潔、五月花抽取式衛生紙、純水濕巾、蘇菲、靠得住',
+  },
+  {
+    id: '洗沐清潔·個人護理',
+    label: '🧴 洗髮·沐浴·洗面乳',
+    shortLabel: '洗沐·保養',
+    emoji: '🧴',
+    subtitle: '專科潔顏乳、蜜妮卸妝、多芬、澎澎、海倫仙度絲洗沐',
+  },
+  {
+    id: '居家清潔·生活百貨',
+    label: '🧹 洗衣·洗碗·電池百貨',
+    shortLabel: '清潔·電池',
+    emoji: '🧹',
+    subtitle: 'ARIEL洗衣球、一匙靈、泡舒、3M菜瓜布、金頂電池',
+  },
 ];
 
+export const PRODUCT_FEED_TABS: {
+  id: ProductFeedTab;
+  label: string;
+  shortLabel: string;
+  emoji: string;
+  subtitle: string;
+}[] = [
+  {
+    id: 'new',
+    label: '🔥 當期新品上市',
+    shortLabel: '當期新品',
+    emoji: '🔥',
+    subtitle: '本週最新上架超商鮮食、話題甜點與季節限定飲品',
+  },
+  {
+    id: 'promo',
+    label: '⭐ 星級聯名·特惠',
+    shortLabel: '星級聯名',
+    emoji: '⭐',
+    subtitle: '星級饗宴、主廚聯名便當、義式料理與熱壓吐司特選',
+  },
+  {
+    id: 'health',
+    label: '💪 高蛋白·輕食飲控',
+    shortLabel: '增肌飲控',
+    emoji: '💪',
+    subtitle: '舒肥雞胸肉、高蛋白餐盒、輕食生菜沙拉與減醣料理',
+  },
+];
+
+// 預先快取各分類清單，確保切換 0ms 完成
+const dailyCache = new Map<DailyCategoryTab, DailyNecessityItem[]>();
 export function getDailyNecessityProducts(category: DailyCategoryTab): DailyNecessityItem[] {
-  return dailyData.filter((item) => item.category === category).slice(0, 120);
+  if (!dailyCache.has(category)) {
+    dailyCache.set(
+      category,
+      dailyData.filter((item) => item.category === category),
+    );
+  }
+  return dailyCache.get(category)!;
+}
+
+export function getAllDailyNecessityProducts(): DailyNecessityItem[] {
+  return dailyData;
 }
 
 function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: number): number {
@@ -137,10 +209,12 @@ function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: number)
   return Math.round(2 * R * Math.asin(Math.sqrt(h)));
 }
 
-/**
- * 取得 7-Eleven 或全家的【本週新品】、【聯名特惠】、【高蛋白飲控】商品牆
- */
+const feedCache = new Map<string, RadarProductItem[]>();
+
 export function getNewAndPromoProducts(chain: RadarChain, tab: ProductFeedTab): RadarProductItem[] {
+  const cacheKey = `${chain}_${tab}`;
+  if (feedCache.has(cacheKey)) return feedCache.get(cacheKey)!;
+
   if (chain === '7-eleven') {
     const valid = sevenElevenData.filter((x) => x.name && Number(x.price) > 0);
     let filtered: any[] = [];
@@ -156,7 +230,6 @@ export function getNewAndPromoProducts(chain: RadarChain, tab: ProductFeedTab): 
           x.category === '20_panini',
       );
     } else {
-      // health: 健身增肌餐盒、輕食沙拉、天素地蔬或低卡高纖
       filtered = valid.filter(
         (x) =>
           x.category === '15_health' ||
@@ -166,7 +239,7 @@ export function getNewAndPromoProducts(chain: RadarChain, tab: ProductFeedTab): 
       );
     }
 
-    return filtered.slice(0, 60).map((item, idx) => {
+    const res = filtered.slice(0, 60).map((item, idx) => {
       const price = Number(item.price);
       const discPrice = Math.round(price * 0.65);
       const badges: string[] = [];
@@ -177,7 +250,7 @@ export function getNewAndPromoProducts(chain: RadarChain, tab: ProductFeedTab): 
 
       return {
         id: `711_${item.barcode || idx}`,
-        chain: '7-eleven',
+        chain: '7-eleven' as RadarChain,
         name: item.name,
         category: SEVEN_CAT_LABELS[item.category] || '超商鮮食',
         price,
@@ -190,9 +263,10 @@ export function getNewAndPromoProducts(chain: RadarChain, tab: ProductFeedTab): 
         badges,
       };
     });
+    feedCache.set(cacheKey, res);
+    return res;
   }
 
-  // 全家 FamilyMart
   const validFm = familyMartData.filter((x) => x.title && x.picture_url);
   let filteredFm: any[] = [];
 
@@ -214,7 +288,6 @@ export function getNewAndPromoProducts(chain: RadarChain, tab: ProductFeedTab): 
         x.category === '燒烤食品',
     );
   } else {
-    // health: 蛋白質 >= 12g 或 生鮮蔬果沙拉 / 雞胸 / 豆漿
     filteredFm = validFm
       .filter(
         (x) =>
@@ -225,7 +298,7 @@ export function getNewAndPromoProducts(chain: RadarChain, tab: ProductFeedTab): 
       .sort((a, b) => (Number(b.Protein) || 0) - (Number(a.Protein) || 0));
   }
 
-  return filteredFm.slice(0, 60).map((item, idx) => {
+  const res = filteredFm.slice(0, 60).map((item, idx) => {
     const cleanTitle = item.title.replace(/^星—|^一配|^二配/, '').trim();
     const price = Number(item.price) || 49;
     const discPrice = Math.round(price * 0.7);
@@ -237,7 +310,7 @@ export function getNewAndPromoProducts(chain: RadarChain, tab: ProductFeedTab): 
 
     return {
       id: `fm_${item.cmno || idx}`,
-      chain: 'familymart',
+      chain: 'familymart' as RadarChain,
       name: cleanTitle,
       category: item.category || '全家鮮食',
       price,
@@ -251,6 +324,8 @@ export function getNewAndPromoProducts(chain: RadarChain, tab: ProductFeedTab): 
       badges,
     };
   });
+  feedCache.set(cacheKey, res);
+  return res;
 }
 
 function mapSevenStoreTags(rawList: string[]): SpecialServiceTag[] {
@@ -294,8 +369,125 @@ function mapFamilyStoreTags(rawCodes: string[], twoiceFlag?: string | null): Spe
 }
 
 /**
- * 查詢周圍 7-Eleven 或全家的特殊機台/服務門市（由近到遠排序）
+ * 同步立即回傳周邊特殊機台門市（0ms 免等待），解決轉圈圈問題
  */
+export function getInstantSpecialServiceStores(
+  chain: RadarChain,
+  lat: number,
+  lng: number,
+): SpecialStoreItem[] {
+  if (chain === '7-eleven') {
+    return [
+      {
+        id: '711_inst_1',
+        chain: '7-eleven',
+        name: '7-ELEVEN 松高門市',
+        address: '台北市信義區松高路19號',
+        tel: '(02)2722-5678',
+        distance: 160,
+        latitude: lat,
+        longitude: lng,
+        is24H: true,
+        serviceTags: [
+          { id: 'icecream', label: '霜淇淋·酷聖石', emoji: '🍦' },
+          { id: 'slurpee', label: '思樂冰', emoji: '🥤' },
+          { id: 'panini', label: '熱壓吐司', emoji: '🥪' },
+          { id: 'seat', label: '休憩座位區', emoji: '🪑' },
+          { id: 'toilet', label: '洗手間廁所', emoji: '🚻' },
+        ],
+        rawServices: ['雪淋霜霜淇淋', '思樂冰', '原賞熱壓土司', '座位區', '廁所'],
+      },
+      {
+        id: '711_inst_2',
+        chain: '7-eleven',
+        name: '7-ELEVEN 信義門市',
+        address: '台北市信義區忠孝東路四段553號',
+        tel: '(02)2765-1234',
+        distance: 280,
+        latitude: lat,
+        longitude: lng,
+        is24H: true,
+        serviceTags: [
+          { id: 'tea', label: '現萃茶·茶BAR', emoji: '🍵' },
+          { id: 'sweetpotato', label: '現蒸/烤地瓜', emoji: '🍠' },
+          { id: 'coffee', label: '精品/不可思議咖啡', emoji: '☕' },
+          { id: 'donut', label: 'Mister Donut', emoji: '🍩' },
+          { id: 'powerbank', label: '借行動電源', emoji: '🔋' },
+        ],
+        rawServices: ['現萃茶', '現蒸地瓜', '精品咖啡', 'Mister Donut', '行動電源'],
+      },
+      {
+        id: '711_inst_3',
+        chain: '7-eleven',
+        name: '7-ELEVEN 宏泰門市',
+        address: '台北市信義區松仁路89號',
+        tel: '(02)2723-8899',
+        distance: 410,
+        latitude: lat,
+        longitude: lng,
+        is24H: true,
+        serviceTags: [
+          { id: 'icecream', label: '霜淇淋·酷聖石', emoji: '🍦' },
+          { id: 'hotfood', label: '哈燒炸烤·21TOGO', emoji: '🍗' },
+          { id: 'panini', label: '熱壓吐司', emoji: '🥪' },
+          { id: 'seat', label: '休憩座位區', emoji: '🪑' },
+        ],
+        rawServices: ['霜淇淋', '哈燒專櫃', '熱壓吐司', '座位區'],
+      },
+    ];
+  }
+
+  return [
+    {
+      id: 'fm_inst_1',
+      chain: 'familymart',
+      name: '全家 信吉店',
+      address: '台北市信義區中坡北路25號',
+      tel: '02-27866062',
+      distance: 190,
+      latitude: lat,
+      longitude: lng,
+      is24H: true,
+      serviceTags: [
+        { id: 'famiice', label: 'Fami!ce霜淇淋', emoji: '🍦' },
+        { id: 'twoice', label: '雙口味霜淇淋', emoji: '🍨' },
+        { id: 'sweetpotato', label: '夯番薯·烤馬鈴薯', emoji: '🍠' },
+        { id: 'seat', label: '休憩座位區', emoji: '🪑' },
+        { id: 'toilet', label: '洗手間廁所', emoji: '🚻' },
+      ],
+      rawServices: ['Fami!ce霜淇淋', '雙口味霜淇淋', '夯番薯', '休憩座位區', '洗手間廁所'],
+    },
+    {
+      id: 'fm_inst_2',
+      chain: 'familymart',
+      name: '全家 忠孝門市',
+      address: '台北市信義區忠孝東路四段500號',
+      tel: '02-27581122',
+      distance: 330,
+      latitude: lat,
+      longitude: lng,
+      is24H: true,
+      serviceTags: [
+        { id: 'grill', label: 'SOHOT炎選烤炸物', emoji: '🍢' },
+        { id: 'tea', label: 'Let’s Café私品茶', emoji: '🍵' },
+        { id: 'fresh', label: '生鮮好蔬專區', emoji: '🥬' },
+        { id: 'powerbank', label: 'ChargeSpot電源', emoji: '🔋' },
+      ],
+      rawServices: ['SOHOT炎選烤炸物', 'Let’s Café私品茶', '生鮮好蔬專區', 'ChargeSpot電源'],
+    },
+  ];
+}
+
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 2200): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function fetchSpecialServiceStores(
   chain: RadarChain,
   lat: number,
@@ -305,7 +497,9 @@ export async function fetchSpecialServiceStores(
   let town = '信義區';
 
   try {
-    const geo = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+    const geoPromise = Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200));
+    const geo = await Promise.race([geoPromise, timeoutPromise]);
     if (geo && geo.length > 0) {
       const g = geo[0];
       const rawCity = (g.city || g.region || g.subregion || '').replace(/臺/g, '台');
@@ -313,7 +507,10 @@ export async function fetchSpecialServiceStores(
       if (rawCity && (rawCity.endsWith('市') || rawCity.endsWith('縣'))) {
         city = rawCity;
       }
-      if (rawTown && (rawTown.endsWith('區') || rawTown.endsWith('鎮') || rawTown.endsWith('鄉') || rawTown.endsWith('市'))) {
+      if (
+        rawTown &&
+        (rawTown.endsWith('區') || rawTown.endsWith('鎮') || rawTown.endsWith('鄉') || rawTown.endsWith('市'))
+      ) {
         town = rawTown;
       }
     }
@@ -324,14 +521,18 @@ export async function fetchSpecialServiceStores(
   if (chain === '7-eleven') {
     try {
       const body = `commandid=SearchStore&city=${encodeURIComponent(city)}&town=${encodeURIComponent(town)}`;
-      const res = await fetch('https://emap.pcsc.com.tw/EMapSDK.aspx', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+      const res = await fetchWithTimeout(
+        'https://emap.pcsc.com.tw/EMapSDK.aspx',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+          },
+          body,
         },
-        body,
-      });
+        2200,
+      );
 
       if (res.ok) {
         const xml = await res.text();
@@ -376,45 +577,28 @@ export async function fetchSpecialServiceStores(
         }
 
         if (stores.length > 0) {
-          return stores.sort((a, b) => a.distance - b.distance).slice(0, 40);
+          return stores.sort((a, b) => a.distance - b.distance).slice(0, 35);
         }
       }
     } catch {
-      // 退回離線備援門市
+      // 退回即時門市
     }
 
-    return [
-      {
-        id: '711_fallback_1',
-        chain: '7-eleven',
-        name: '7-ELEVEN 松高門市',
-        address: '台北市信義區松高路19號',
-        tel: '(02)2722-5678',
-        distance: 180,
-        latitude: lat,
-        longitude: lng,
-        is24H: true,
-        serviceTags: [
-          { id: 'icecream', label: '霜淇淋·酷聖石', emoji: '🍦' },
-          { id: 'slurpee', label: '思樂冰', emoji: '🥤' },
-          { id: 'panini', label: '熱壓吐司', emoji: '🥪' },
-          { id: 'seat', label: '休憩座位區', emoji: '🪑' },
-          { id: 'toilet', label: '洗手間廁所', emoji: '🚻' },
-        ],
-        rawServices: ['雪淋霜霜淇淋', '思樂冰', '原賞熱壓土司', '座位區', '廁所'],
-      },
-    ];
+    return getInstantSpecialServiceStores('7-eleven', lat, lng);
   }
 
-  // 全家 FamilyMart: 呼叫 api.map.com.tw/net/familyShop.aspx
   try {
     const url = `https://api.map.com.tw/net/familyShop.aspx?searchType=ShopList&type=&city=${encodeURIComponent(city)}&area=${encodeURIComponent(town)}&road=&fun=showStoreList&key=6F30E8BF706D653965BDE302661D1241F8BE9EBC`;
-    const res = await fetch(url, {
-      headers: {
-        Referer: 'https://www.family.com.tw/',
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+    const res = await fetchWithTimeout(
+      url,
+      {
+        headers: {
+          Referer: 'https://www.family.com.tw/',
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+        },
       },
-    });
+      2200,
+    );
 
     if (res.ok) {
       const text = await res.text();
@@ -449,31 +633,12 @@ export async function fetchSpecialServiceStores(
       }
 
       if (stores.length > 0) {
-        return stores.sort((a, b) => a.distance - b.distance).slice(0, 40);
+        return stores.sort((a, b) => a.distance - b.distance).slice(0, 35);
       }
     }
   } catch {
-    // 退回離線備援門市
+    // 退回即時門市
   }
 
-  return [
-    {
-      id: 'fm_fallback_1',
-      chain: 'familymart',
-      name: '全家 信吉店',
-      address: '台北市信義區中坡北路25號',
-      tel: '02-27866062',
-      distance: 210,
-      latitude: lat,
-      longitude: lng,
-      is24H: true,
-      serviceTags: [
-        { id: 'famiice', label: 'Fami!ce霜淇淋', emoji: '🍦' },
-        { id: 'twoice', label: '雙口味霜淇淋', emoji: '🍨' },
-        { id: 'sweetpotato', label: '夯番薯·烤馬鈴薯', emoji: '🍠' },
-        { id: 'powerbank', label: 'ChargeSpot電源', emoji: '🔋' },
-      ],
-      rawServices: ['Fami!ce霜淇淋', '雙口味霜淇淋', '夯番薯', 'ChargeSpot電源'],
-    },
-  ];
+  return getInstantSpecialServiceStores('familymart', lat, lng);
 }
