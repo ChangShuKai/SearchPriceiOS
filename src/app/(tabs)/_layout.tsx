@@ -31,6 +31,13 @@ export default function TabLayout() {
           md="add_circle"
         />
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="account">
+        <NativeTabs.Trigger.Label>我的帳號</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'person.crop.circle', selected: 'person.crop.circle.fill' }}
+          md="account_circle"
+        />
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }

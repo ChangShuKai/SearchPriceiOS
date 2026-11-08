@@ -146,13 +146,13 @@ export function getDb(): Promise<SQLite.SQLiteDatabase> {
       try {
         const engineMeta = await db.getFirstAsync<{ value: string }>(
           'SELECT value FROM meta WHERE key = ?',
-          'fast_engine_v15',
+          'fast_engine_v16',
         );
         if (!engineMeta?.value) {
           await db.runAsync('DELETE FROM price_reports WHERE synced = 1');
           await db.runAsync(
             'INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)',
-            'fast_engine_v15',
+            'fast_engine_v16',
             '1',
           );
           await db.runAsync(
