@@ -25,7 +25,6 @@ jobs:
       - name: Patch Podfile & Install CocoaPods
         run: |
           cd ios
-          # 停用 Pods 的模組生成，防止 dummy.m 編譯崩潰
           python3 -c "
           with open('Podfile', 'r') as f:
               content = f.read()
@@ -48,40 +47,40 @@ jobs:
           pod install
           cd ..
 
-      - name: Build iOS Application
+      - name: Build iOS Application (Archive)
         run: |
           cd ios
-          mkdir -p build_output
           export NODE_BINARY=$(which node)
 
-          # 直接針對 SearchPrice 專案與 Scheme 構建，透過 ONLY_ACTIVE_ARCH=NO 與明確關閉 User Script Sandboxing
-          xcodebuild build \
+          # 採用標準 archive 流程，完全避免自訂 output 目錄衝突
+          xcodebuild archive \
             -workspace SearchPrice.xcworkspace \
             -scheme SearchPrice \
             -configuration Release \
-            -sdk iphoneos \
             -destination "generic/platform=iOS" \
-            CONFIGURATION_BUILD_DIR="$(pwd)/build_output" \
+            -archivePath "$(pwd)/SearchPrice.xcarchive" \
             CODE_SIGN_STYLE="Manual" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
-            COMPILER_INDEX_STORE_ENABLE=NO \
             ENABLE_USER_SCRIPT_SANDBOXING=NO
 
           cd ..
 
       - name: Package iOS IPA
         run: |
-          APP_PATH=$(find ios/build_output -type d -name "*.app" -maxdepth 1 | head -n 1)
+          # 直接從 xcarchive 的 Products/Applications 提取編譯好的 .app
+          APP_PATH=$(find ios/SearchPrice.xcarchive/Products/Applications -name "*.app" | head -n 1)
+
           if [ -z "$APP_PATH" ]; then
+            echo "Searching fallback app path:"
             APP_PATH=$(find . -type d -name "*.app" ! -path "*/Pods/*" | head -n 1)
           fi
 
           echo "Target App Path: $APP_PATH"
           if [ -z "$APP_PATH" ]; then
-            echo "Error: Xcode did not produce any .app bundle."
+            echo "Error: No .app found in archive."
             exit 1
           fi
 
