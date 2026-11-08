@@ -5,7 +5,7 @@ on:
 
 jobs:
   # ------------------------------------------------------------------
-  # 任務 1：Android APK 編譯（獨立執行，約 10~15 分鐘）
+  # 任務 1：Android APK 編譯（Linux 並行執行）
   # ------------------------------------------------------------------
   build-android:
     runs-on: ubuntu-latest
@@ -50,7 +50,7 @@ jobs:
           retention-days: 7
 
   # ------------------------------------------------------------------
-  # 任務 2：iOS IPA 編譯（獨立執行，由 macOS 專門處理）
+  # 任務 2：iOS IPA 編譯（macOS 修復 ScanDependencies）
   # ------------------------------------------------------------------
   build-ios:
     runs-on: macos-latest
@@ -70,9 +70,25 @@ jobs:
       - name: Prebuild iOS
         run: npx expo prebuild --platform ios --clean
 
-      - name: Install CocoaPods
+      - name: Patch Podfile & Install CocoaPods
         run: |
           cd ios
+          # 自動在 Podfile 加入關閉模組驗證與啟用傳統依賴解析設定
+          cat << 'EOF' >> Podfile
+
+          post_install do |installer|
+            installer.pods_project.targets.each do |target|
+              target.build_configurations.each do |config|
+                config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
+                config.build_settings['DEFINES_MODULE'] = 'NO'
+                config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ""
+                config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"
+                config.build_settings['CODE_SIGNING_ALLOWED'] = "NO"
+              end
+            end
+          end
+          EOF
+
           pod install
           cd ..
 
@@ -80,35 +96,36 @@ jobs:
         run: |
           cd ios
           
-          # 列出所有 Targets 與 Schemes 供檢查
-          xcodebuild -list
-          
-          # 取得 Target 名稱（通常即為專案名稱）
+          # 取得 Target 名稱
           TARGET_NAME=$(xcodebuild -list -json | python3 -c "import sys, json; data=json.load(sys.stdin); targets=data.get('project', {}).get('targets', []); print(targets[0] if targets else 'SearchPrice')")
           echo "Building Target: $TARGET_NAME"
 
           mkdir -p build_output
+          export NODE_BINARY=$(which node)
 
-          # 使用 target 進行 Release 編譯，強制產出完整 .app 到 build_output
+          # 清理 DerivedData
+          rm -rf ~/Library/Developer/Xcode/DerivedData/*
+
+          # 關閉 Explicit Module 與 Index Store，避開 ScanDependencies 報錯
           xcodebuild build \
-            -workspace *.xcworkspace \
+            -workspace SearchPrice.xcworkspace \
             -scheme "$TARGET_NAME" \
             -configuration Release \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
             CONFIGURATION_BUILD_DIR="$(pwd)/build_output" \
+            CODE_SIGN_STYLE="Manual" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            OTHER_CFLAGS="-fno-modules-validate-once-per-build-session"
 
           cd ..
 
       - name: Package iOS IPA
         run: |
-          echo "Files in build_output:"
-          ls -la ios/build_output || true
-
           APP_PATH=$(find ios/build_output -type d -name "*.app" -maxdepth 1 | head -n 1)
           if [ -z "$APP_PATH" ]; then
             APP_PATH=$(find . -type d -name "*.app" ! -path "*/Pods/*" | head -n 1)
