@@ -50,7 +50,7 @@ jobs:
           retention-days: 7
 
   # ------------------------------------------------------------------
-  # 任務 2：iOS IPA 編譯（macOS 修復 ScanDependencies）
+  # 任務 2：iOS IPA 編譯（安全注入 post_install，解決模組衝突）
   # ------------------------------------------------------------------
   build-ios:
     runs-on: macos-latest
@@ -73,21 +73,29 @@ jobs:
       - name: Patch Podfile & Install CocoaPods
         run: |
           cd ios
-          # 自動在 Podfile 加入關閉模組驗證與啟用傳統依賴解析設定
-          cat << 'EOF' >> Podfile
-
-          post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              target.build_configurations.each do |config|
-                config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
-                config.build_settings['DEFINES_MODULE'] = 'NO'
-                config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ""
-                config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"
-                config.build_settings['CODE_SIGNING_ALLOWED'] = "NO"
+          # 使用 Python 將設定安全插入 Expo 原有的 post_install 區塊內，不建立第二個 hook
+          python3 -c "
+          with open('Podfile', 'r') as f:
+              content = f.read()
+          
+          patch = '''
+              installer.pods_project.targets.each do |target|
+                target.build_configurations.each do |config|
+                  config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ''
+                  config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+                  config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+                end
               end
-            end
-          end
-          EOF
+          '''
+          
+          if 'post_install do |installer|' in content:
+              content = content.replace('post_install do |installer|', 'post_install do |installer|' + patch)
+              with open('Podfile', 'w') as f:
+                  f.write(content)
+              print('Successfully patched existing post_install hook.')
+          else:
+              print('Warning: post_install hook not found, skipping patch.')
+          "
 
           pod install
           cd ..
@@ -96,17 +104,15 @@ jobs:
         run: |
           cd ios
           
-          # 取得 Target 名稱
           TARGET_NAME=$(xcodebuild -list -json | python3 -c "import sys, json; data=json.load(sys.stdin); targets=data.get('project', {}).get('targets', []); print(targets[0] if targets else 'SearchPrice')")
           echo "Building Target: $TARGET_NAME"
 
           mkdir -p build_output
           export NODE_BINARY=$(which node)
 
-          # 清理 DerivedData
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
 
-          # 關閉 Explicit Module 與 Index Store，避開 ScanDependencies 報錯
+          # 透過 -configuration Release 與免簽名參數構建
           xcodebuild build \
             -workspace SearchPrice.xcworkspace \
             -scheme "$TARGET_NAME" \
@@ -119,8 +125,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            OTHER_CFLAGS="-fno-modules-validate-once-per-build-session"
+            COMPILER_INDEX_STORE_ENABLE=NO
 
           cd ..
 
