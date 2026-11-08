@@ -82,9 +82,25 @@ export default function DiscountScreen() {
           granted = req.status === 'granted';
         }
         if (granted && !cancelled) {
-          const pos = await Location.getLastKnownPositionAsync();
+          let pos = await Location.getLastKnownPositionAsync();
+          if (!pos) {
+            pos = await Promise.race([
+              Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+              new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+            ]);
+          }
           if (pos) {
             coordsRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            // 立即以真實座標所在的縣市更新 0ms 預覽（包含全台 502 間寶雅）
+            if (!cancelled) {
+              setStores(
+                getInstantChainDiscounts(
+                  selectedChain,
+                  coordsRef.current.lat,
+                  coordsRef.current.lng,
+                ),
+              );
+            }
           }
         }
         const liveResult = await fetchChainDiscounts(

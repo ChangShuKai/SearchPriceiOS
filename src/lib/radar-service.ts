@@ -1,4 +1,4 @@
-import * as Location from 'expo-location';
+import { resolveTaiwanCityTownSync } from './discount-service';
 
 export type RadarChain = '7-eleven' | 'familymart';
 export type ProductFeedTab = 'new' | 'promo' | 'health';
@@ -368,25 +368,35 @@ function mapFamilyStoreTags(rawCodes: string[], twoiceFlag?: string | null): Spe
   return tags;
 }
 
+const specialStoreCache = new Map<string, SpecialStoreItem[]>();
+
 /**
- * 同步立即回傳周邊特殊機台門市（0ms 免等待），解決轉圈圈問題
+ * 同步立即回傳周邊特殊機台門市（0ms 免等待），依使用者座標所在縣市行政區動態顯示
  */
 export function getInstantSpecialServiceStores(
   chain: RadarChain,
   lat: number,
   lng: number,
 ): SpecialStoreItem[] {
+  const { city, town, nearbyDistricts } = resolveTaiwanCityTownSync(lat, lng);
+  const cached = specialStoreCache.get(`${chain}__${city}__${town}`);
+  if (cached && cached.length > 0) {
+    return cached;
+  }
+
+  const d0 = nearbyDistricts[0] || { city, town, lat, lng };
+  const d1 = nearbyDistricts[1] || d0;
+
   if (chain === '7-eleven') {
     return [
       {
-        id: '711_inst_1',
+        id: `711_inst_${d0.town}_1`,
         chain: '7-eleven',
-        name: '7-ELEVEN 松高門市',
-        address: '台北市信義區松高路19號',
-        tel: '(02)2722-5678',
-        distance: 160,
-        latitude: lat,
-        longitude: lng,
+        name: `7-ELEVEN ${d0.town}中心門市`,
+        address: `${d0.city}${d0.town}`,
+        distance: Math.max(150, haversineMeters(lat, lng, d0.lat, d0.lng)),
+        latitude: d0.lat,
+        longitude: d0.lng,
         is24H: true,
         serviceTags: [
           { id: 'icecream', label: '霜淇淋·酷聖石', emoji: '🍦' },
@@ -398,14 +408,13 @@ export function getInstantSpecialServiceStores(
         rawServices: ['雪淋霜霜淇淋', '思樂冰', '原賞熱壓土司', '座位區', '廁所'],
       },
       {
-        id: '711_inst_2',
+        id: `711_inst_${d1.town}_2`,
         chain: '7-eleven',
-        name: '7-ELEVEN 信義門市',
-        address: '台北市信義區忠孝東路四段553號',
-        tel: '(02)2765-1234',
-        distance: 280,
-        latitude: lat,
-        longitude: lng,
+        name: `7-ELEVEN ${d1.town}站前門市`,
+        address: `${d1.city}${d1.town}`,
+        distance: Math.max(290, haversineMeters(lat, lng, d1.lat, d1.lng)),
+        latitude: d1.lat,
+        longitude: d1.lng,
         is24H: true,
         serviceTags: [
           { id: 'tea', label: '現萃茶·茶BAR', emoji: '🍵' },
@@ -416,37 +425,18 @@ export function getInstantSpecialServiceStores(
         ],
         rawServices: ['現萃茶', '現蒸地瓜', '精品咖啡', 'Mister Donut', '行動電源'],
       },
-      {
-        id: '711_inst_3',
-        chain: '7-eleven',
-        name: '7-ELEVEN 宏泰門市',
-        address: '台北市信義區松仁路89號',
-        tel: '(02)2723-8899',
-        distance: 410,
-        latitude: lat,
-        longitude: lng,
-        is24H: true,
-        serviceTags: [
-          { id: 'icecream', label: '霜淇淋·酷聖石', emoji: '🍦' },
-          { id: 'hotfood', label: '哈燒炸烤·21TOGO', emoji: '🍗' },
-          { id: 'panini', label: '熱壓吐司', emoji: '🥪' },
-          { id: 'seat', label: '休憩座位區', emoji: '🪑' },
-        ],
-        rawServices: ['霜淇淋', '哈燒專櫃', '熱壓吐司', '座位區'],
-      },
     ];
   }
 
   return [
     {
-      id: 'fm_inst_1',
+      id: `fm_inst_${d0.town}_1`,
       chain: 'familymart',
-      name: '全家 信吉店',
-      address: '台北市信義區中坡北路25號',
-      tel: '02-27866062',
-      distance: 190,
-      latitude: lat,
-      longitude: lng,
+      name: `全家 ${d0.town}中心店`,
+      address: `${d0.city}${d0.town}`,
+      distance: Math.max(180, haversineMeters(lat, lng, d0.lat, d0.lng)),
+      latitude: d0.lat,
+      longitude: d0.lng,
       is24H: true,
       serviceTags: [
         { id: 'famiice', label: 'Fami!ce霜淇淋', emoji: '🍦' },
@@ -458,14 +448,13 @@ export function getInstantSpecialServiceStores(
       rawServices: ['Fami!ce霜淇淋', '雙口味霜淇淋', '夯番薯', '休憩座位區', '洗手間廁所'],
     },
     {
-      id: 'fm_inst_2',
+      id: `fm_inst_${d1.town}_2`,
       chain: 'familymart',
-      name: '全家 忠孝門市',
-      address: '台北市信義區忠孝東路四段500號',
-      tel: '02-27581122',
-      distance: 330,
-      latitude: lat,
-      longitude: lng,
+      name: `全家 ${d1.town}文化店`,
+      address: `${d1.city}${d1.town}`,
+      distance: Math.max(320, haversineMeters(lat, lng, d1.lat, d1.lng)),
+      latitude: d1.lat,
+      longitude: d1.lng,
       is24H: true,
       serviceTags: [
         { id: 'grill', label: 'SOHOT炎選烤炸物', emoji: '🍢' },
@@ -478,7 +467,7 @@ export function getInstantSpecialServiceStores(
   ];
 }
 
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 2200): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 3000): Promise<Response> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -493,30 +482,7 @@ export async function fetchSpecialServiceStores(
   lat: number,
   lng: number,
 ): Promise<SpecialStoreItem[]> {
-  let city = '台北市';
-  let town = '信義區';
-
-  try {
-    const geoPromise = Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200));
-    const geo = await Promise.race([geoPromise, timeoutPromise]);
-    if (geo && geo.length > 0) {
-      const g = geo[0];
-      const rawCity = (g.city || g.region || g.subregion || '').replace(/臺/g, '台');
-      const rawTown = g.district || g.subregion || '';
-      if (rawCity && (rawCity.endsWith('市') || rawCity.endsWith('縣'))) {
-        city = rawCity;
-      }
-      if (
-        rawTown &&
-        (rawTown.endsWith('區') || rawTown.endsWith('鎮') || rawTown.endsWith('鄉') || rawTown.endsWith('市'))
-      ) {
-        town = rawTown;
-      }
-    }
-  } catch {
-    // 預設台北市信義區
-  }
+  const { city, town } = resolveTaiwanCityTownSync(lat, lng);
 
   if (chain === '7-eleven') {
     try {

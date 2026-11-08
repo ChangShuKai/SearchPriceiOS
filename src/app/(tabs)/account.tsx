@@ -43,6 +43,16 @@ const CHAIN_BADGES = [
   { id: 'cosmed', label: '康', bg: '#EA5514', fg: '#FFFFFF' },
 ];
 
+const CHAIN_DISPLAY_NAMES: Record<string, string> = {
+  poya: '寶雅 POYA',
+  cosmed: '康是美 COSMED',
+  familymart: '全家便利商店 FamilyMart',
+  pxmart: '全聯福利中心 PX Mart',
+  '7-eleven': '7-Eleven 統一超商',
+  carrefour: '家樂福 Carrefour',
+  watsons: '屈臣氏 Watsons',
+};
+
 export default function AccountScreen() {
   const isDark = useColorScheme() === 'dark';
   const insets = useSafeAreaInsets();
@@ -324,10 +334,12 @@ export default function AccountScreen() {
               </View>
               <Text
                 style={[styles.profileSub, { color: textSecondary }]}
-                numberOfLines={1}>
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.85}>
                 {profile
                   ? profile.email
-                  : '支援 Email 帳密註冊登入與 Sign in with Google'}
+                  : '支援 Email 帳密與 Google 雲端登入'}
               </Text>
             </View>
 
@@ -374,8 +386,14 @@ export default function AccountScreen() {
                   styles.quickAuthPrimaryBtn,
                   { backgroundColor: isDark ? '#1F6FEB' : '#2F4842' },
                 ]}>
-                <AppIcon name="person.crop.circle" size={16} color="#FFFFFF" />
-                <Text style={styles.quickAuthPrimaryText}>帳密登入 / 註冊</Text>
+                <AppIcon name="person.crop.circle" size={15} color="#FFFFFF" />
+                <Text
+                  style={styles.quickAuthPrimaryText}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}>
+                  帳密登入 / 註冊
+                </Text>
               </Pressable>
 
               <Pressable
@@ -390,7 +408,11 @@ export default function AccountScreen() {
                 <View style={styles.googleGIcon}>
                   <Text style={styles.googleGText}>G</Text>
                 </View>
-                <Text style={[styles.quickAuthGoogleText, { color: textPrimary }]}>
+                <Text
+                  style={[styles.quickAuthGoogleText, { color: textPrimary }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}>
                   Sign in with Google
                 </Text>
               </Pressable>
@@ -424,16 +446,20 @@ export default function AccountScreen() {
               <View style={styles.appTitleCol}>
                 <Text
                   style={[styles.appCardTitle, { color: textPrimary }]}
-                  numberOfLines={1}>
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}>
                   Search Price
                 </Text>
                 <Text
                   style={[styles.appCardSubtitle, { color: textSecondary }]}
-                  numberOfLines={1}>
-                  全台跨通路比價...
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}>
+                  全台跨通路比價
                 </Text>
               </View>
-              <AppIcon name="chevron.right" size={15} color={textSecondary} />
+              <AppIcon name="chevron.right" size={14} color={textSecondary} />
             </View>
 
             {/* 大字體雙色版本號 1.1 / 1.1.0 */}
@@ -458,7 +484,7 @@ export default function AccountScreen() {
                       styles.stackCircle,
                       {
                         backgroundColor: b.bg,
-                        marginLeft: idx === 0 ? 0 : -8,
+                        marginLeft: idx === 0 ? 0 : -6,
                         borderColor: bentoCardBg,
                       },
                     ]}>
@@ -492,7 +518,7 @@ export default function AccountScreen() {
 
           {/* 右欄四張堆疊膠囊卡片 */}
           <View style={styles.bentoRightCol}>
-            {/* 右 1：系統狀態（薄荷青底色，顯示簡單狀態，點擊進入詳細狀態） */}
+            {/* 右 1：系統狀態（薄荷青底色，點擊進入詳細狀態） */}
             <Pressable
               onPress={() => {
                 void Haptics.selectionAsync();
@@ -506,7 +532,7 @@ export default function AccountScreen() {
                 },
               ]}>
               <View style={[styles.rightPillIconCircle, { backgroundColor: '#4A6362' }]}>
-                <AppIcon name="checkmark.icloud.fill" size={18} color="#FFFFFF" />
+                <AppIcon name="checkmark.icloud.fill" size={17} color="#FFFFFF" />
               </View>
               <View style={styles.rightPillTextCol}>
                 <Text
@@ -514,21 +540,15 @@ export default function AccountScreen() {
                     styles.rightPillTitle,
                     { color: isDark ? '#E6FFFA' : '#2C4241' },
                   ]}
-                  numberOfLines={1}>
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}>
                   系統狀態
-                </Text>
-                <Text
-                  style={[
-                    styles.rightPillSub,
-                    { color: isDark ? '#81E6D9' : '#4A6B69' },
-                  ]}
-                  numberOfLines={1}>
-                  {isSystemHealthy ? `正常 · ${totalCountFormatted} 筆` : '離線備援中'}
                 </Text>
               </View>
               <AppIcon
                 name="chevron.right"
-                size={15}
+                size={14}
                 color={isDark ? '#81E6D9' : '#5E7A78'}
               />
             </Pressable>
@@ -551,16 +571,18 @@ export default function AccountScreen() {
                   styles.rightPillIconCircle,
                   { backgroundColor: isDark ? '#262C36' : '#DCE0DF' },
                 ]}>
-                <AppIcon name="megaphone.fill" size={17} color={textPrimary} />
+                <AppIcon name="megaphone.fill" size={16} color={textPrimary} />
               </View>
               <View style={styles.rightPillTextCol}>
                 <Text
                   style={[styles.rightPillTitle, { color: textPrimary }]}
-                  numberOfLines={1}>
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}>
                   公告
                 </Text>
               </View>
-              <AppIcon name="arrow.up.right.square" size={16} color={textSecondary} />
+              <AppIcon name="arrow.up.right.square" size={15} color={textSecondary} />
             </Pressable>
 
             {/* 右 3：伺服器狀態（點擊同樣進入詳細系統狀態） */}
@@ -581,16 +603,18 @@ export default function AccountScreen() {
                   styles.rightPillIconCircle,
                   { backgroundColor: isDark ? '#262C36' : '#DCE0DF' },
                 ]}>
-                <AppIcon name="server.rack" size={17} color={textPrimary} />
+                <AppIcon name="server.rack" size={16} color={textPrimary} />
               </View>
               <View style={styles.rightPillTextCol}>
                 <Text
                   style={[styles.rightPillTitle, { color: textPrimary }]}
-                  numberOfLines={1}>
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}>
                   伺服器狀態
                 </Text>
               </View>
-              <AppIcon name="chevron.right" size={15} color={textSecondary} />
+              <AppIcon name="chevron.right" size={14} color={textSecondary} />
             </Pressable>
 
             {/* 右 4：支援我們（暖金底色 + 金框 + 愛心圓標，對齊 IMG_2682 右下角） */}
@@ -609,7 +633,7 @@ export default function AccountScreen() {
                 },
               ]}>
               <View style={[styles.rightPillIconCircle, { backgroundColor: '#785B12' }]}>
-                <AppIcon name="heart.fill" size={17} color="#FFFFFF" />
+                <AppIcon name="heart.fill" size={16} color="#FFFFFF" />
               </View>
               <View style={styles.rightPillTextCol}>
                 <Text
@@ -617,13 +641,15 @@ export default function AccountScreen() {
                     styles.rightPillTitle,
                     { color: isDark ? '#FEF08A' : '#4D3802' },
                   ]}
-                  numberOfLines={1}>
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}>
                   支援我們
                 </Text>
               </View>
               <AppIcon
                 name="chevron.right"
-                size={15}
+                size={14}
                 color={isDark ? '#FDE047' : '#785B12'}
               />
             </Pressable>
@@ -740,14 +766,18 @@ export default function AccountScreen() {
 
             <View style={styles.creditItemRow}>
               <Text style={[styles.creditLabel, { color: textSecondary }]}>版權狀態</Text>
-              <Text style={[styles.creditValueHighlight, { color: '#059669' }]}>
-                © 2026 SixStarCulture · All Rights Reserved
+              <Text
+                style={[styles.creditValueHighlight, { color: '#059669' }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}>
+                © 2026 SixStarCulture 版權所有
               </Text>
             </View>
           </View>
 
           <Text style={[styles.copyrightFootnote, { color: textSecondary }]}>
-            Produced by ChangShuKai · SixStarCulture Studio. 版權所有，翻印或未經授權商業轉載必究。各超商與量販通路商標分屬原權利公司所有。
+            Produced by ChangShuKai · SixStarCulture Studio. © 2026 SixStarCulture. All Rights Reserved. 版權所有，翻印或未經授權商業轉載必究。
           </Text>
         </View>
       </ScrollView>
@@ -1117,8 +1147,12 @@ export default function AccountScreen() {
 
                 <View style={styles.serviceRow}>
                   <View style={styles.serviceLeft}>
-                    <AppIcon name="server.rack" size={17} color="#0284C7" />
-                    <Text style={[styles.serviceName, { color: textPrimary }]}>
+                    <AppIcon name="server.rack" size={16} color="#0284C7" />
+                    <Text
+                      style={[styles.serviceName, { color: textPrimary }]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.85}>
                       Supabase PostgreSQL 雲端庫
                     </Text>
                   </View>
@@ -1132,9 +1166,13 @@ export default function AccountScreen() {
 
                 <View style={styles.serviceRow}>
                   <View style={styles.serviceLeft}>
-                    <AppIcon name="person.crop.circle.fill" size={17} color="#10B981" />
-                    <Text style={[styles.serviceName, { color: textPrimary }]}>
-                      Supabase Auth (帳密 / Google OAuth)
+                    <AppIcon name="person.crop.circle.fill" size={16} color="#10B981" />
+                    <Text
+                      style={[styles.serviceName, { color: textPrimary }]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.85}>
+                      Supabase Auth (帳密 / Google)
                     </Text>
                   </View>
                   <View style={styles.serviceStatusPill}>
@@ -1145,8 +1183,12 @@ export default function AccountScreen() {
 
                 <View style={styles.serviceRow}>
                   <View style={styles.serviceLeft}>
-                    <AppIcon name="bolt.fill" size={17} color="#F59E0B" />
-                    <Text style={[styles.serviceName, { color: textPrimary }]}>
+                    <AppIcon name="bolt.fill" size={16} color="#F59E0B" />
+                    <Text
+                      style={[styles.serviceName, { color: textPrimary }]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.85}>
                       In-Memory 記憶體高速索引引擎
                     </Text>
                   </View>
@@ -1158,9 +1200,13 @@ export default function AccountScreen() {
 
                 <View style={styles.serviceRow}>
                   <View style={styles.serviceLeft}>
-                    <AppIcon name="location.fill" size={17} color="#8B5CF6" />
-                    <Text style={[styles.serviceName, { color: textPrimary }]}>
-                      7-11 / 全家即期與特殊機台雷達 API
+                    <AppIcon name="location.fill" size={16} color="#8B5CF6" />
+                    <Text
+                      style={[styles.serviceName, { color: textPrimary }]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.85}>
+                      7-11 / 全家即期與特殊機台雷達
                     </Text>
                   </View>
                   <View style={styles.serviceStatusPill}>
@@ -1232,7 +1278,7 @@ export default function AccountScreen() {
                       <View key={item.chain} style={styles.chainStatRow}>
                         <View style={styles.chainStatHeader}>
                           <Text style={[styles.chainStatName, { color: textPrimary }]}>
-                            {item.chain}
+                            {CHAIN_DISPLAY_NAMES[item.chain] || item.chain}
                           </Text>
                           <Text style={[styles.chainStatCount, { color: textSecondary }]}>
                             {item.count.toLocaleString()} 筆
@@ -1455,20 +1501,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 11,
+    paddingHorizontal: 10,
     borderRadius: 16,
   },
   quickAuthPrimaryText: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
+    flexShrink: 1,
   },
   quickAuthGoogleBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
+    gap: 6,
     paddingVertical: 11,
+    paddingHorizontal: 10,
     borderRadius: 16,
     borderWidth: 1,
   },
@@ -1479,6 +1528,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#4285F4',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   googleGText: {
     color: '#FFFFFF',
@@ -1486,56 +1536,59 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   quickAuthGoogleText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
+    flexShrink: 1,
   },
 
   // 2. 中間雙欄 Bento 區（對齊 IMG_2682.PNG）
   bentoGrid: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   bentoLeftCard: {
-    flex: 1.05,
+    flex: 0.96,
     borderRadius: 28,
-    padding: 18,
+    padding: 15,
     borderWidth: 1,
     justifyContent: 'space-between',
-    minHeight: 288,
+    minHeight: 280,
   },
   appHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   appMiniLogo: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    flexShrink: 0,
   },
   appTitleCol: {
     flex: 1,
+    minWidth: 0,
     gap: 2,
   },
   appCardTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
   },
   appCardSubtitle: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '600',
   },
   versionHeroBlock: {
-    marginVertical: 10,
+    marginVertical: 8,
   },
   versionBigGradient: {
-    fontSize: 48,
+    fontSize: 50,
     fontWeight: '900',
     letterSpacing: -1.5,
-    lineHeight: 54,
+    lineHeight: 56,
   },
   versionSubNumber: {
-    fontSize: 25,
+    fontSize: 24,
     fontWeight: '800',
     letterSpacing: -0.5,
     marginTop: 2,
@@ -1551,53 +1604,53 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   stackCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 27,
+    height: 27,
+    borderRadius: 13.5,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
   },
   stackCircleText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
   },
   stackMorePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
   },
   stackMoreText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '800',
   },
   releaseBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginTop: 12,
+    gap: 8,
+    marginTop: 10,
   },
   officialBadge: {
-    paddingHorizontal: 11,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 3.5,
     borderRadius: 99,
     backgroundColor: 'rgba(34, 197, 94, 0.14)',
     borderWidth: 1,
     borderColor: '#4ADE80',
   },
   officialBadgeText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
     color: '#15803D',
   },
   releaseDateText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
   },
 
   // 右欄四張膠囊卡片
   bentoRightCol: {
-    flex: 1,
+    flex: 1.04,
     gap: 10,
     justifyContent: 'space-between',
   },
@@ -1608,24 +1661,25 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    gap: 10,
+    gap: 9,
   },
   supportPillCard: {
     borderWidth: 1.2,
   },
   rightPillIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   rightPillTextCol: {
     flex: 1,
-    gap: 1,
+    minWidth: 0,
   },
   rightPillTitle: {
-    fontSize: 15,
+    fontSize: 14.5,
     fontWeight: '800',
   },
   rightPillSub: {
@@ -1736,17 +1790,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 12,
   },
   creditLabel: {
     fontSize: 14,
     fontWeight: '600',
+    flexShrink: 0,
   },
   creditValue: {
+    flex: 1,
+    textAlign: 'right',
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.2,
   },
   creditValueHighlight: {
+    flex: 1,
+    textAlign: 'right',
     fontSize: 13,
     fontWeight: '800',
   },
@@ -1947,15 +2007,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 4,
+    gap: 10,
   },
   serviceLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
+    gap: 8,
     flex: 1,
+    minWidth: 0,
   },
   serviceName: {
-    fontSize: 13.5,
+    flex: 1,
+    flexShrink: 1,
+    fontSize: 13,
     fontWeight: '600',
   },
   serviceStatusPill: {
@@ -1966,6 +2030,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 99,
+    flexShrink: 0,
   },
   greenDotSmall: {
     width: 6,

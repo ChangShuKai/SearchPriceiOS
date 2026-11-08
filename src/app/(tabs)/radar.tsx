@@ -99,9 +99,24 @@ export default function RadarScreen() {
           granted = req.status === 'granted';
         }
         if (granted && !cancelled) {
-          const pos = await Location.getLastKnownPositionAsync();
+          let pos = await Location.getLastKnownPositionAsync();
+          if (!pos) {
+            pos = await Promise.race([
+              Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+              new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+            ]);
+          }
           if (pos) {
             coordsRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            if (!cancelled) {
+              setSpecialStores(
+                getInstantSpecialServiceStores(
+                  selectedChain,
+                  coordsRef.current.lat,
+                  coordsRef.current.lng,
+                ),
+              );
+            }
           }
         }
         const list = await fetchSpecialServiceStores(
